@@ -525,7 +525,7 @@ TableViewLastColumnResizingFixer::TableViewLastColumnResizingFixer(QTableView* t
 #ifdef WIN32
 fs::path static StartupShortcutPath()
 {
-    std::string chain = gArgs.GetChainMode();
+    std::string chain = TAPYRUS_MODES::GetChainName(gArgs.GetChainMode());
     if (chain == TAPYRUS_OP_MODE::MAIN)
         return GetSpecialFolderPath(CSIDL_STARTUP) / "Tapyrus.lnk";
     return GetSpecialFolderPath(CSIDL_STARTUP) / strprintf("Tapyrus (%s).lnk", chain);
@@ -621,7 +621,7 @@ fs::path static GetAutostartDir()
 
 fs::path static GetAutostartFilePath()
 {
-    std::string chain = gArgs.GetChainMode();
+    std::string chain = TAPYRUS_MODES::GetChainName(gArgs.GetChainMode());
     if (chain == TAPYRUS_OP_MODE::MAIN)
         return GetAutostartDir() / "tapyrus.desktop";
     return GetAutostartDir() / strprintf("tapyrus-%s.lnk", chain);
@@ -663,7 +663,7 @@ bool SetStartOnSystemStartup(bool fAutoStart)
         fs::ofstream optionFile(GetAutostartFilePath(), std::ios_base::out|std::ios_base::trunc);
         if (!optionFile.good())
             return false;
-        std::string chain = gArgs.GetChainMode();
+        std::string chain = TAPYRUS_MODES::GetChainName(gArgs.GetChainMode());
         // Write a bitcoin.desktop file to the autostart directory:
         optionFile << "[Desktop Entry]\n";
         optionFile << "Type=Application\n";
