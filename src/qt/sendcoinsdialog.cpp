@@ -380,7 +380,7 @@ void SendCoinsDialog::on_sendButton_clicked()
         accept();
         CoinControlDialog::coinControl()->UnSelectAll();
         coinControlUpdateLabels();
-        Q_EMIT coinsSent(currentTransaction.getWtx()->get().GetHash());
+        Q_EMIT coinsSent(currentTransaction.getWtx()->get().GetHashMalFix());
     }
     fNewRecipientAllowed = true;
 }
