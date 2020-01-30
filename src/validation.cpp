@@ -4070,6 +4070,7 @@ bool LoadExternalBlockFile(const CChainParams& chainparams, FILE* fileIn, CDiskB
                 if (nSize < 80 || nSize > MAX_BLOCK_SERIALIZED_SIZE)
                     continue;
             } catch (const std::exception&) {
+                LogPrintf("No valid block header found [%x%x%x%x]\n", BaseParams().MessageStart()[0], BaseParams().MessageStart()[1], BaseParams().MessageStart()[2], BaseParams().MessageStart()[3]);
                 // no valid block header found; don't complain
                 break;
             }
