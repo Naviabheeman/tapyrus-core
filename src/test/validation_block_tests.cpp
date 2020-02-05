@@ -16,7 +16,7 @@
 #include <validationinterface.h>
 
 struct RegtestingSetup : public TestingSetup {
-    RegtestingSetup() : TestingSetup(TAPYRUS_MODES::REGTEST) {}
+    RegtestingSetup() : TestingSetup(TAPYRUS_MODES::DEV) {}
 };
 
 BOOST_FIXTURE_TEST_SUITE(validation_block_tests, RegtestingSetup)
@@ -50,7 +50,7 @@ struct TestSubscriber : public CValidationInterface {
 std::shared_ptr<CBlock> Block(const uint256& prev_hash)
 {
     static int i = 0;
-    static uint64_t time = BaseParams().GenesisBlock().nTime;
+    static uint64_t time = FederationParams().GenesisBlock().nTime;
 
     CScript pubKey;
     pubKey << i++ << OP_TRUE;
@@ -76,7 +76,7 @@ std::shared_ptr<CBlock> FinalizeBlock(std::shared_ptr<CBlock> pblock)
 
     std::vector<unsigned char> blockProof;
     createSignedBlockProof(*pblock, blockProof);
-    pblock->AbsorbBlockProof(blockProof, BaseParams().GetAggregatePubkey());
+    pblock->AbsorbBlockProof(blockProof, FederationParams().GetAggregatePubkey());
     BOOST_CHECK_EQUAL(pblock->proof.size(), blockProof.size());
     return pblock;
 }
@@ -137,7 +137,7 @@ BOOST_AUTO_TEST_CASE(processnewblock_signals_ordering)
     std::vector<std::shared_ptr<const CBlock>> blocks;
     while (blocks.size() < 50) {
         blocks.clear();
-        BuildChain(BaseParams().GenesisBlock().GetHash(), 100, 15, 10, 500, blocks);
+        BuildChain(FederationParams().GenesisBlock().GetHash(), 100, 15, 10, 500, blocks);
     }
 
     bool ignored;
@@ -146,10 +146,10 @@ BOOST_AUTO_TEST_CASE(processnewblock_signals_ordering)
     std::transform(blocks.begin(), blocks.end(), std::back_inserter(headers), [](std::shared_ptr<const CBlock> b) { return b->GetBlockHeader(); });
 
     // Process all the headers so we understand the toplogy of the chain
-    BOOST_CHECK(ProcessNewBlockHeaders(headers, state, Params()));
+    BOOST_CHECK(ProcessNewBlockHeaders(headers, state));
 
     // Connect the genesis block and drain any outstanding events
-    ProcessNewBlock(Params(), std::make_shared<CBlock>(BaseParams().GenesisBlock()), true, &ignored);
+    ProcessNewBlock(std::make_shared<CBlock>(FederationParams().GenesisBlock()), true, &ignored);
     SyncWithValidationInterfaceQueue();
 
     // subscribe to events (this subscriber will validate event ordering)
@@ -172,18 +172,18 @@ BOOST_AUTO_TEST_CASE(processnewblock_signals_ordering)
                 auto block = blocks[GetRand(blocks.size() - 1)];
                 BOOST_CHECK_EQUAL(block->proof.size(), 64);
                 CValidationState state;
-                BOOST_CHECK(CheckBlockHeader(*block, state, Params().GetConsensus()));
-                ProcessNewBlock(Params(), block, true, &ignored);
+                BOOST_CHECK(CheckBlockHeader(*block, state));
+                ProcessNewBlock(block, true, &ignored);
             }
 
             // to make sure that eventually we process the full chain - do it here
             for (auto block : blocks) {
                 BOOST_CHECK_EQUAL(block->proof.size(), 64);
                 CValidationState state;
-                BOOST_CHECK(CheckBlockHeader(*block, state, Params().GetConsensus()));
-                ProcessNewBlock(Params(), block, true, &ignored);
+                BOOST_CHECK(CheckBlockHeader(*block, state));
+                ProcessNewBlock(block, true, &ignored);
                 if (block->vtx.size() == 1) {
-                    bool processed = ProcessNewBlock(Params(), block, true, &ignored);
+                    bool processed = ProcessNewBlock(block, true, &ignored);
                     assert(processed);
                 }
             }

@@ -59,10 +59,10 @@ BasicTestingSetup::BasicTestingSetup(const std::string& chainName)
     InitSignatureCache();
     InitScriptExecutionCache();
     fCheckBlockIndex = true;
-    SelectParams(TAPYRUS_OP_MODE::MAIN);
+    SelectParams(TAPYRUS_OP_MODE::PROD);
     SetDataDir("tempdir");
     writeTestGenesisBlockToFile(GetDataDir());
-    SelectBaseParams(TAPYRUS_OP_MODE::MAIN);
+    SelectFederationParams(TAPYRUS_OP_MODE::PROD);
     noui_connect();
 }
 
@@ -88,8 +88,7 @@ fs::path BasicTestingSetup::GetDataDir()
 
 TestingSetup::TestingSetup(const std::string& chainName) : BasicTestingSetup(chainName)
 {
-    SetDataDir("tempdir");
-    const CChainParams& chainparams = Params();
+        SetDataDir("tempdir");
         // Ideally we'd move all the RPC tests to the functional testing framework
         // instead of unit tests, but for now we need these here.
 
@@ -105,12 +104,12 @@ TestingSetup::TestingSetup(const std::string& chainName) : BasicTestingSetup(cha
         pblocktree.reset(new CBlockTreeDB(1 << 20, true));
         pcoinsdbview.reset(new CCoinsViewDB(1 << 23, true));
         pcoinsTip.reset(new CCoinsViewCache(pcoinsdbview.get()));
-        if (!LoadGenesisBlock(chainparams)) {
+        if (!LoadGenesisBlock()) {
             throw std::runtime_error("LoadGenesisBlock failed.");
         }
         {
             CValidationState state;
-            if (!ActivateBestChain(state, chainparams)) {
+            if (!ActivateBestChain(state)) {
                 throw std::runtime_error(strprintf("ActivateBestChain failed. (%s)", FormatStateMessage(state)));
             }
         }
@@ -148,7 +147,7 @@ void createSignedBlockProof(CBlock &block, std::vector<unsigned char>& blockProo
     return;
 }
 
-TestChain100Setup::TestChain100Setup() : TestingSetup(TAPYRUS_MODES::REGTEST)
+TestChain100Setup::TestChain100Setup() : TestingSetup(TAPYRUS_MODES::DEV)
 {
     // CreateAndProcessBlock() does not support building SegWit blocks, so don't activate in these tests.
     // Generate a 100-block chain:
@@ -186,10 +185,10 @@ TestChain100Setup::CreateAndProcessBlock(const std::vector<CMutableTransaction>&
     }
     std::vector<unsigned char> blockProof;
     createSignedBlockProof(pblocktemplate->block, blockProof);
-    block.AbsorbBlockProof(blockProof, BaseParams().GetAggregatePubkey());
+    block.AbsorbBlockProof(blockProof, FederationParams().GetAggregatePubkey());
 
     std::shared_ptr<const CBlock> shared_pblock = std::make_shared<const CBlock>(block);
-    ProcessNewBlock(chainparams, shared_pblock, true, nullptr);
+    ProcessNewBlock(shared_pblock, true, nullptr);
 
     CBlock result = block;
     return result;

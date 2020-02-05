@@ -2,7 +2,8 @@
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-bin_PROGRAMS += qt/tapyrus_qt
+
+bin_PROGRAMS += qt/tapyrus-qt
 EXTRA_LIBRARIES += qt/libtapyrusqt.a
 
 # bitcoin qt core #
@@ -443,9 +444,10 @@ CLEAN_QT = $(nodist_qt_libtapyrusqt_a_SOURCES) $(QT_QM) $(QT_FORMS_H) qt/*.gcda 
 CLEANFILES += $(CLEAN_QT)
 
 tapyrus_qt_clean: FORCE
-	rm -f $(CLEAN_QT) $(qt_libtapyrusqt_a_OBJECTS) $(qt_tapyrus_qt_OBJECTS) qt/tapyrus_qt$(EXEEXT) $(LIBBITCOINQT)
+	rm -f $(CLEAN_QT) $(qt_libtapyrusqt_a_OBJECTS) $(qt_tapyrus_qt_OBJECTS) qt/tapyrus-qt$(EXEEXT) $(LIBBITCOINQT)
 
-tapyrus_qt : qt/tapyrus_qt$(EXEEXT)
+tapyrus_qt : qt/tapyrus-qt$(EXEEXT)
+
 
 ui_%.h: %.ui
 	@test -f $(UIC)

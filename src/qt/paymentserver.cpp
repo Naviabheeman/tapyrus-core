@@ -75,7 +75,7 @@ namespace // Anon namespace
 //
 static QString ipcServerName()
 {
-    QString name("BitcoinQt");
+    QString name("TapyrusQt");
 
     // Append a simple hash of the datadir
     // Note that GetDataDir(true) returns a different path
@@ -209,12 +209,12 @@ void PaymentServer::ipcParseCommandLine(interfaces::Node& node, int argc, char* 
             SendCoinsRecipient r;
             if (GUIUtil::parseBitcoinURI(arg, &r) && !r.address.isEmpty())
             {
-                auto tempChainParams = CreateChainParams(TAPYRUS_OP_MODE::MAIN);
+                auto tempChainParams = CreateChainParams(TAPYRUS_OP_MODE::PROD);
 
                 if (IsValidDestinationString(r.address.toStdString(), *tempChainParams)) {
                     node.selectParams();
                 } else {
-                    tempChainParams = CreateChainParams(TAPYRUS_OP_MODE::REGTEST);
+                    tempChainParams = CreateChainParams(TAPYRUS_OP_MODE::DEV);
                     if (IsValidDestinationString(r.address.toStdString(), *tempChainParams)) {
                         node.selectParams();
                     }
@@ -228,11 +228,11 @@ void PaymentServer::ipcParseCommandLine(interfaces::Node& node, int argc, char* 
             PaymentRequestPlus request;
             if (readPaymentRequestFromFile(arg, request))
             {
-                if (request.getDetails().network() == "main")
+                if (request.getDetails().network() == "prod")
                 {
                     node.selectParams();
                 }
-                else if (request.getDetails().network() == "regtest")
+                else if (request.getDetails().network() == "dev")
                 {
                     node.selectParams();
                 }
@@ -752,7 +752,7 @@ bool PaymentServer::verifyNetwork(interfaces::Node& node, const payments::Paymen
         qWarning() << QString("PaymentServer::%1: Payment request network \"%2\" doesn't match client network \"%3\".")
             .arg(__func__)
             .arg(QString::fromStdString(requestDetails.network()))
-            .arg(QString::fromStdString(node.getNetwork()));
+            .arg(QString::fromStdString(TAPYRUS_MODES::GetChainName(gArgs.GetChainMode())));
     }
     return fVerified;
 }

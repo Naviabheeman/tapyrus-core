@@ -46,8 +46,9 @@ void RPCNestedTests::rpcNestedTests()
     std::string result2;
     std::string filtered;
     auto node = interfaces::MakeNode();
+
     RPCConsole::RPCExecuteCommandLine(*node, result, "getblockchaininfo()[mode]", &filtered);
-    QVERIFY(result=="main");
+    QVERIFY(result=="prod");
     RPCConsole::RPCExecuteCommandLine(*node, result, "getblockchaininfo()[chain]", &filtered); //simple result filtering with path
     QVERIFY(result=="1");
     QVERIFY(filtered == "getblockchaininfo()[chain]");

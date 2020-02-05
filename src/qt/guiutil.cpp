@@ -526,7 +526,7 @@ TableViewLastColumnResizingFixer::TableViewLastColumnResizingFixer(QTableView* t
 fs::path static StartupShortcutPath()
 {
     std::string chain = TAPYRUS_MODES::GetChainName(gArgs.GetChainMode());
-    if (chain == TAPYRUS_MODES::MAIN)
+    if (chain == TAPYRUS_MODES::PROD)
         return GetSpecialFolderPath(CSIDL_STARTUP) / "Tapyrus.lnk";
     return GetSpecialFolderPath(CSIDL_STARTUP) / strprintf("Tapyrus (%s).lnk", chain);
 }
@@ -560,8 +560,8 @@ bool SetStartOnSystemStartup(bool fAutoStart)
 
             // Start client minimized
             QString strArgs = "-min";
-            // Set -regtest options
-            strArgs += QString::fromStdString(strprintf(" -regtest=%d", gArgs.GetBoolArg("-regtest", false)));
+            // Set -dev options
+            strArgs += QString::fromStdString(strprintf(" -dev=%d", gArgs.GetBoolArg("-dev", false)));
 
 #ifdef UNICODE
             boost::scoped_array<TCHAR> args(new TCHAR[strArgs.length() + 1]);
@@ -622,7 +622,7 @@ fs::path static GetAutostartDir()
 fs::path static GetAutostartFilePath()
 {
     std::string chain = TAPYRUS_MODES::GetChainName(gArgs.GetChainMode());
-    if (chain == TAPYRUS_MODES::MAIN)
+    if (chain == TAPYRUS_MODES::PROD)
         return GetAutostartDir() / "tapyrus.desktop";
     return GetAutostartDir() / strprintf("tapyrus-%s.lnk", chain);
 }
@@ -663,15 +663,17 @@ bool SetStartOnSystemStartup(bool fAutoStart)
         fs::ofstream optionFile(GetAutostartFilePath(), std::ios_base::out|std::ios_base::trunc);
         if (!optionFile.good())
             return false;
+
         std::string chain = TAPYRUS_MODES::GetChainName(gArgs.GetChainMode());
         // Write a bitcoin.desktop file to the autostart directory:
         optionFile << "[Desktop Entry]\n";
         optionFile << "Type=Application\n";
-        if (chain == TAPYRUS_MODES::MAIN)
+
+        if (chain == TAPYRUS_MODES::PROD)
             optionFile << "Name=Tapyrus\n";
         else
             optionFile << strprintf("Name=Tapyrus (%s)\n", chain);
-        optionFile << "Exec=" << pszExePath << strprintf(" -min  -regtest=%d\n", gArgs.GetBoolArg("-regtest", false));
+        optionFile << "Exec=" << pszExePath << strprintf(" -min  -dev=%d\n", gArgs.GetBoolArg("-dev", false));
         optionFile << "Terminal=false\n";
         optionFile << "Hidden=false\n";
         optionFile.close();

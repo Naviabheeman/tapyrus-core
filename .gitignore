@@ -1,4 +1,5 @@
 *.tar.gz
+.vscode
 
 *.exe
 src/tapyrus
@@ -8,7 +9,7 @@ src/tapyrus-tx
 src/tapyrus-genesis
 src/test/test_tapyrus
 src/test/test_tapyrus_fuzzy
-src/qt/test/test_tapyrus-qt
+src/qt/test/test_tapyrus_qt
 
 # autoreconf
 Makefile.in
@@ -81,13 +82,13 @@ src/qt/tapyrus_qt.includes
 # Compilation and Qt preprocessor part
 *.qm
 Makefile
-tapyrus_qt
+tapyrus-qt
 Tapyrus-Qt.app
 background.tiff*
 
 # Unit-tests
 Makefile.test
-tapyrus_qt_test
+tapyrus-qt_test
 
 # Resources cpp
 qrc_*.cpp
@@ -100,7 +101,7 @@ build
 *.gcno
 *.gcda
 /*.info
-test_bitcoin.coverage/
+test_tapyrus.coverage/
 total.coverage/
 coverage_percent.txt
 

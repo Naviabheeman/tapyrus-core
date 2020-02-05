@@ -17,7 +17,7 @@ option(BUILD_TAPYRUS_GENESIS "Build tapyrus-genesis" ON)
 option(BUILD_BITCOIN_TX "Build tapyrus-tx" ON)
 
 # TODO: Fix qt building problem and turn ON.
-option(BUILD_BITCOIN_QT "Build tapyrus_qt" ON)
+option(BUILD_BITCOIN_QT "Build tapyrus-qt" ON)
 
 # Ensure that WINDRES_PREPROC is enabled when using windres.
 if(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
@@ -137,11 +137,11 @@ target_compile_definitions(util PUBLIC BOOST_SP_USE_STD_ATOMIC BOOST_AC_USE_STD_
 add_library(common
         base58.cpp
         chainparams.cpp
-        chainparamsbase.cpp
         coins.cpp
         compressor.cpp
         core_read.cpp
         core_write.cpp
+        federationparams.cpp
         key.cpp
         keystore.cpp
         netaddress.cpp
