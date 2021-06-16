@@ -259,13 +259,13 @@ class WalletColoredCoinTest(BitcoinTestFramework):
         assert_array_result(self.nodes[0].listtransactions(),
                             {"txid": txid3},
                             {"category": "send",
-                            "token" : self.colorids[2],
+                            "token" : bytes_to_hex_str(colorid1),
                             "amount": -10,
                             "confirmations": 0})
         assert_array_result(self.nodes[1].listtransactions(),
                             {"txid": txid3},
                             {"category": "receive",
-                            "token" : self.colorids[2],
+                            "token" : bytes_to_hex_str(colorid1),
                             "amount": 10,
                             "confirmations": 0})
 
@@ -293,15 +293,15 @@ class WalletColoredCoinTest(BitcoinTestFramework):
         assert_array_result(self.nodes[0].listtransactions(),
                             {"txid": txid5},
                             {"category": "send",
-                            "token" : self.colorids[4],
+                            "token" : bytes_to_hex_str(colorid1),
                             "amount": -10,
-                            "confirmations": 0})
+                            "confirmations": 1})
         assert_array_result(self.nodes[1].listtransactions(),
                             {"txid": txid5},
                             {"category": "receive",
-                            "token" : self.colorids[4],
+                            "token" : bytes_to_hex_str(colorid1),
                             "amount": 10,
-                            "confirmations": 0})
+                            "confirmations": 1})
 
         #NFT can be transferred only once. so call it only the first time
         if(rpcname == "sendtoaddress"):
@@ -460,13 +460,13 @@ reverse_bytes = (lambda txid  : txid[-1: -len(txid)-1: -1])
                             {"txid": txid_transfer},
                             {"category": "send",
                             "token" : bytes_to_hex_str(colorid2),
-                            "amount": Decimal("-10.0"),
+                            "amount": -10,
                             "confirmations": 0})
         assert_array_result(self.nodes[0].listtransactions(),
                             {"txid": txid_transfer},
                             {"category": "receive",
                             "token" : bytes_to_hex_str(colorid2),
-                            "amount": Decimal("10.0"),
+                            "amount": 10,
                             "confirmations": 0})
         #mine a block, confirmations should change:
         self.nodes[2].generate(1, self.signblockprivkey_wif)
@@ -475,13 +475,13 @@ reverse_bytes = (lambda txid  : txid[-1: -len(txid)-1: -1])
                             {"txid": txid_transfer},
                             {"category": "send",
                             "token" : bytes_to_hex_str(colorid2),
-                            "amount": Decimal("-10.0"),
+                            "amount": -10,
                             "confirmations": 1})
         assert_array_result(self.nodes[0].listtransactions(),
                             {"txid": txid_transfer},
                             {"category": "receive",
                             "token" : bytes_to_hex_str(colorid2),
-                            "amount": Decimal("10.0"),
+                            "amount": 10,
                             "confirmations": 1})
 
 
@@ -519,12 +519,11 @@ reverse_bytes = (lambda txid  : txid[-1: -len(txid)-1: -1])
         txid_issue = res['txid']
         assert_equal(res['color'], colorid3)
 
-
         assert_array_result(self.nodes[2].listtransactions(),
                             {"txid": txid_issue},
                             {"category": "receive",
                             "token" : colorid3,
-                            "amount": Decimal("100.0"),
+                            "amount": 100,
                             "confirmations": 0})
         #mine a block, confirmations should change:
         self.nodes[2].generate(1, self.signblockprivkey_wif)
@@ -533,7 +532,7 @@ reverse_bytes = (lambda txid  : txid[-1: -len(txid)-1: -1])
                             {"txid": txid_issue},
                             {"category": "receive",
                             "token" : colorid3,
-                            "amount": Decimal("100.0"),
+                            "amount": 100,
                             "confirmations": 1})
 
         walletinfo = self.nodes[0].getwalletinfo()
