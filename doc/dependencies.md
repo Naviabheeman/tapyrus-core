@@ -22,6 +22,7 @@ These are the dependencies currently used by Bitcoin Core. You can find instruct
 | Python (tests) |  | [3.4](https://www.python.org/downloads) |  |  |  |
 | qrencode | [3.4.4](https://fukuchi.org/works/qrencode) |  | No |  |  |
 | Qt | [5.9.6](https://download.qt.io/official_releases/qt/) | 5.x | No |  |  |
+| systemtap | [4.7](https://sourceware.org/systemtap/) |  |  |  |  |
 | XCB |  |  |  |  | [Yes](https://github.com/bitcoin/bitcoin/blob/master/depends/packages/qt.mk#L87) (Linux only) |
 | xkbcommon |  |  |  |  | [Yes](https://github.com/bitcoin/bitcoin/blob/master/depends/packages/qt.mk#L86) (Linux only) |
 | ZeroMQ | [4.2.3](https://github.com/zeromq/libzmq/releases) |  | No |  |  |

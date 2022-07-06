@@ -22,6 +22,7 @@
 #include <scheduler.h>
 #include <ui_interface.h>
 #include <utilstrencodings.h>
+#include <trace.h>
 
 #ifdef WIN32
 #include <string.h>
@@ -2821,9 +2822,18 @@ bool CConnman::NodeFullyConnected(const CNode* pnode)
 void CConnman::PushMessage(CNode* pnode, CSerializedNetMsg&& msg)
 {
     size_t nMessageSize = msg.data.size();
-    size_t nTotalSize = nMessageSize + CMessageHeader::HEADER_SIZE;
-    LogPrint(BCLog::NET, "sending %s (%d bytes) peer=%d\n",  SanitizeString(msg.command.c_str()), nMessageSize, pnode->GetId());
+    LogPrint(BCLog::NET, "sending %s (%d bytes) peer=%d\n", msg.command, nMessageSize, pnode->GetId());
 
+    TRACE6(net, outbound_message,
+        pnode->GetId(),
+        pnode->GetAddrName().c_str(),
+        pnode->fInbound? "Inbound" : "",
+        msg.command.c_str(),
+        nMessageSize,
+        msg.data
+    );
+
+    // make sure we use the appropriate network transport format
     std::vector<unsigned char> serializedHeader;
     serializedHeader.reserve(CMessageHeader::HEADER_SIZE);
     uint256 hash = Hash(msg.data.data(), msg.data.data() + nMessageSize);
@@ -2831,6 +2841,7 @@ void CConnman::PushMessage(CNode* pnode, CSerializedNetMsg&& msg)
     memcpy(hdr.pchChecksum, hash.begin(), CMessageHeader::CHECKSUM_SIZE);
 
     CVectorWriter{SER_NETWORK, INIT_PROTO_VERSION, serializedHeader, 0, hdr};
+    size_t nTotalSize = nMessageSize + serializedHeader.size();
 
     size_t nBytesSent = 0;
     {

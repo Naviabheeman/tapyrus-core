@@ -92,6 +92,10 @@ ZMQ dependencies (provides ZMQ API 4.x):
 
     sudo apt-get install libzmq3-dev
 
+User-Space, Statically Defined Tracing (USDT) dependencies:
+
+    sudo apt install systemtap-sdt-dev
+
 #### GUI
 
 tapyrus-core does not support gui
@@ -103,6 +107,10 @@ tapyrus-core does not support gui
 Build requirements:
 
     sudo dnf install gcc-c++ libtool make autoconf automake libevent-devel boost-devel libdb4-devel libdb4-cxx-devel python3
+
+User-Space, Statically Defined Tracing (USDT) dependencies:
+
+    sudo dnf install systemtap
 
 Optional:
 
