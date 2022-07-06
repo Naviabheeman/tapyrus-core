@@ -22,7 +22,10 @@
 #include <scheduler.h>
 #include <ui_interface.h>
 #include <utilstrencodings.h>
+<<<<<<< HEAD
 #include <xfieldhistory.h>
+=======
+>>>>>>> e396c96347 (user space static tracing support for inbound and outbound network messages)
 #include <trace.h>
 
 #ifdef WIN32
