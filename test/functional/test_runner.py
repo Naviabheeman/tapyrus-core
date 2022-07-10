@@ -100,6 +100,7 @@ BASE_SCRIPTS = [
     'wallet_keypool_topup.py',
     'interface_zmq.py',
     'interface_bitcoin_cli.py',
+    'interface_usdt_utxocache.py',
     'mempool_resurrect.py',
     'wallet_txn_doublespend.py --mineblock',
     'wallet_txn_doublespend.py --mineblock --scheme SCHNORR',

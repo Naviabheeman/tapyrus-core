@@ -53,6 +53,9 @@ public:
     void SetHex(const std::string& str);
     std::string ToString() const;
 
+    const unsigned char* getdata() const { return data; }
+    unsigned char* getdata() { return data; }
+
     unsigned char* begin()
     {
         return &data[0];
