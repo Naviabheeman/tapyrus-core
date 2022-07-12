@@ -108,7 +108,6 @@ BASE_SCRIPTS = [
     'wallet_disableprivatekeys.py',
     'wallet_disableprivatekeys.py --usecli',
     'interface_http.py',
-    'interface_usdt_net.py',
     'rpc_psbt.py',
     'rpc_psbt.py --scheme SCHNORR',
     'rpc_users.py',
@@ -225,8 +224,12 @@ DEBUG_MODE_SCRIPTS = [
     'rpc_scantxoutset.py'
 ]
 
+USDT_SCRIPTS = [
+    'interface_usdt_net.py',
+]
+
 # Place EXTENDED_SCRIPTS first since it has the 3 longest running tests
-ALL_SCRIPTS = EXTENDED_SCRIPTS + BASE_SCRIPTS
+ALL_SCRIPTS = EXTENDED_SCRIPTS + BASE_SCRIPTS + USDT_SCRIPTS
 
 NON_SCRIPTS = [
     # These are python files that live in the functional tests directory, but are not test scripts.
@@ -281,6 +284,7 @@ def main():
     enable_wallet = config["components"].getboolean("ENABLE_WALLET")
     enable_utils = config["components"].getboolean("ENABLE_UTILS")
     enable_bitcoind = config["components"].getboolean("ENABLE_BITCOIND")
+    enable_usdt = config["components"].getboolean("ENABLE_USDT")
 
     if config["environment"]["EXEEXT"] == ".exe" and not args.force:
         # https://github.com/bitcoin/bitcoin/commit/d52802551752140cf41f0d9a225a43e84404d3e9
@@ -313,6 +317,10 @@ def main():
 
     if args.debugscripts:
         test_list += DEBUG_MODE_SCRIPTS
+
+    if enable_usdt:
+        test_list += USDT_SCRIPTS
+
     # Remove the test cases that the user has explicitly asked to exclude.
     if args.exclude:
         exclude_tests = [re.sub("\.py$", "", test) + ".py" for test in args.exclude.split(',')]
