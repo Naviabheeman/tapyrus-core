@@ -112,7 +112,7 @@ jobs:
           RUN_BENCH=true \
           DEBUD_MODE=false \
           GOAL="install" \
-          BITCOIN_CONFIG="--enable-zmq --with-incompatible-bdb --enable-reduce-exports --with-gui=no --use_usdt=yes CPPFLAGS=-DDEBUG_LOCKORDER" \
+          BITCOIN_CONFIG="--enable-zmq --with-incompatible-bdb --enable-reduce-exports --with-gui=no --enable-usdt CPPFLAGS=-DDEBUG_LOCKORDER" \
           bash -xe ./build-test.sh
 
   linux-with-qt:
