@@ -43,6 +43,7 @@ Optional dependencies:
  libdb4.8    | Berkeley DB      | Wallet storage (only needed when wallet enabled)
  univalue    | Utility          | JSON parsing and encoding (bundled version will be used unless --with-system-univalue passed to configure)
  libzmq3     | ZMQ notification | Optional, allows generating ZMQ notifications (requires ZMQ version >= 4.x)
+ systemtap   | Tracing (USDT)   | Optional, statically defined tracepoints
 
 For the versions used, see [dependencies.md](dependencies.md)
 
