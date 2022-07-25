@@ -21,7 +21,6 @@
 #include <sync.h>
 #include <uint256.h>
 #include <threadinterrupt.h>
-#include <ui_interface.h>
 
 #include <atomic>
 #include <deque>
