@@ -1,8 +1,16 @@
+#for kernel libraries
+FROM linuxkit/kernel:4.15 as ksrc
+
 FROM --platform=$TARGETPLATFORM tapyrus/builder:v0.2.0 as builder
 ARG TARGETARCH
 
 ENV LC_ALL C.UTF-8
-ENV TAPYRUS_CONFIG "--disable-tests --disable-bench --disable-dependency-tracking  --bindir=/tapyrus-core/dist/bin  --libdir=/tapyrus-core/dist/lib --enable-zmq --enable-reduce-exports --with-incompatible-bdb --with-gui=no CPPFLAGS=-DDEBUG_LOCKORDER"
+ENV TAPYRUS_CONFIG "--disable-tests --disable-bench --disable-dependency-tracking  --bindir=/tapyrus-core/dist/bin  --libdir=/tapyrus-core/dist/lib --enable-zmq --enable-reduce-exports --with-incompatible-bdb --with-gui=no --with-usdt=yes CPPFLAGS=-DDEBUG_LOCKORDER"
+
+ENV TRACE_PACKAGES "cmake gdb gdbserver rsync zip openssh-server lldb ssh systemtap-sdt-dev bpfcc-tools python3-bpfcc"
+
+RUN apt-get update && \
+    apt-get install --no-install-recommends --no-upgrade -qq $TRACE_PACKAGES
 
 WORKDIR /tapyrus-core
 COPY . .
@@ -16,6 +24,38 @@ RUN ./autogen.sh && \
 FROM ubuntu:18.04
 
 COPY --from=builder /tapyrus-core/dist/bin/* /usr/local/bin/
+
+#source code
+WORKDIR /tapyrus-core
+COPY . .
+
+#kernel dev modules
+WORKDIR /kernel
+COPY --from=ksrc /kernel-dev.tar .
+RUN tar xf kernel-dev.tar
+
+#bpftrace
+ENV BPFTRACE_VERSION v0.15.0
+WORKDIR /bpftrace
+RUN apt-get update && apt-get install -y \
+    wget vim tmux git binutils unzip && \
+    wget https://github.com/iovisor/bpftrace/releases/download/${BPFTRACE_VERSION}/bpftrace && \
+    chmod +x bpftrace && \
+    mv bpftrace /bin && \
+    mkdir -p /tracing && \
+    wget https://github.com/iovisor/bpftrace/archive/${BPFTRACE_VERSION}.zip && \
+    unzip ${BPFTRACE_VERSION}.zip && \
+    cp -r bpftrace*/tools /tracing &&\
+    mv /kernel/usr/src/linux-headers* /kernel/usr/src/linux-headers
+
+ENV BPFTRACE_KERNEL_SOURCE=/kernel/usr/src/linux-headers
+
+# configure SSH for communication with Visual Studio 
+RUN mkdir -p /var/run/sshd
+
+#RUN echo 'root:root' | chpasswd \
+#    && sed -i 's/#PermitRootLogin prohibit-password/#PermitRootLogin yes/' /etc/ssh/sshd_config \
+#    && sed 's@session\s*required\s*pam_loginuid.so@session #optional pam_loginuid.so@g' -i /etc/pam.d/sshd
 
 ENV DATA_DIR='/var/lib/tapyrus' \
     CONF_DIR='/etc/tapyrus'
