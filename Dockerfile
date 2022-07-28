@@ -1,21 +1,16 @@
-FROM linuxkit/kernel:5.15.110-9c153b657f4a39023d01eb2ff395c58f1bb331da-amd64 as ksrc
+#for kernel libraries
+FROM linuxkit/kernel:4.15 as ksrc
+
 FROM --platform=$TARGETPLATFORM tapyrus/builder:v0.4.0 as builder
 ARG TARGETARCH
 
 ENV LC_ALL C.UTF-8
-ENV TAPYRUS_CONFIG "--disable-tests --disable-bench --disable-dependency-tracking  --bindir=/tapyrus-core/dist/bin  --libdir=/tapyrus-core/dist/lib --enable-zmq --enable-reduce-exports --with-incompatible-bdb --with-gui=no --enable-cxx --disable-shared --disable-replication --with-pic CPPFLAGS=-DDEBUG_LOCKORDER"
+ENV TAPYRUS_CONFIG "--disable-tests --disable-bench --disable-dependency-tracking  --bindir=/tapyrus-core/dist/bin  --libdir=/tapyrus-core/dist/lib --enable-zmq --enable-reduce-exports --with-incompatible-bdb --with-gui=no --with-usdt=yes CPPFLAGS=-DDEBUG_LOCKORDER"
 
-ENV BUILD_PACKAGES "build-essential libtool autotools-dev automake pkg-config bsdmainutils curl git ca-certificates ccache g++ make cmake gdb gdbserver rsync zip openssh-server lldb ssh python3 bison"
+ENV TRACE_PACKAGES "cmake gdb gdbserver rsync zip openssh-server lldb ssh systemtap-sdt-dev bpfcc-tools python3-bpfcc"
 
-ENV TRACE_PACKAGES "bpfcc-tools systemtap-sdt-dev python3-bpfcc"
-
-ENV DEBIAN_FRONTEND=noninteractive
-RUN apt-get update
-RUN apt-get install --no-install-recommends --no-upgrade -qq $PACKAGES
-RUN apt-get install --no-install-recommends --no-upgrade -qq $BUILD_PACKAGES
-RUN apt-get install --no-install-recommends --no-upgrade -qq $TRACE_PACKAGES
-RUN apt-get install --no-install-recommends --no-upgrade -qq linux-headers-generic
-
+RUN apt-get update && \
+    apt-get install --no-install-recommends --no-upgrade -qq $TRACE_PACKAGES
 
 WORKDIR /tapyrus-core
 COPY . .
@@ -30,23 +25,26 @@ FROM ubuntu:20.04
 
 COPY --from=builder /tapyrus-core/dist/bin/* /usr/local/bin/
 
-ENV TRACE_PACKAGES "ssh bpfcc-tools bpftrace python3-bpfcc"
+#source code
+WORKDIR /tapyrus-core
+COPY . .
 
-RUN apt-get update
-RUN apt-get install --no-install-recommends --fix-missing --no-upgrade -qq $TRACE_PACKAGES
-
+#kernel dev modules
 WORKDIR /kernel
-COPY  --from=ksrc /kernel-dev.tar .
+COPY --from=ksrc /kernel-dev.tar .
 RUN tar xf kernel-dev.tar
 RUN mv /kernel/usr/src/linux-headers* /kernel/usr/src/linux-headers
 ENV BPFTRACE_KERNEL_SOURCE=/kernel/usr/src/linux-headers
+
+# configure SSH for communication with Visual Studio 
+RUN mkdir -p /var/run/sshd
 
 ENV DATA_DIR='/var/lib/tapyrus' \
     CONF_DIR='/etc/tapyrus'
 RUN mkdir ${DATA_DIR} && mkdir ${CONF_DIR}
 
 # p2p port (Production/Development) rpc port (Production/Development)
-EXPOSE 2357 12383 2377 12381
+EXPOSE 2357 12383 2377 12381 22
 
 COPY entrypoint.sh /usr/local/bin/
 
