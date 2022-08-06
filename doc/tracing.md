@@ -208,7 +208,7 @@ stap validation block_connected  0x00000000002fb10c /src/tapyrusd
 
 ### With `readelf`
 
-The `readelf` tool can be used to display the USDT tracepoints in Bitcoin Core.
+The `readelf` tool can be used to display the USDT tracepoints in Tapyrus Core.
 Look for the notes with the description `NT_STAPSDT`.
 
 ```

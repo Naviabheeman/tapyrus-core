@@ -129,8 +129,8 @@ def print_message(event, inbound):
           )
 
 
-def main(bitcoind_path):
-    bitcoind_with_usdts = USDT(path=str(bitcoind_path))
+def main(tapyrusd_path):
+    bitcoind_with_usdts = USDT(path=str(tapyrusd_path))
 
     # attaching the trace functions defined in the BPF program to the tracepoints
     bitcoind_with_usdts.enable_probe(
