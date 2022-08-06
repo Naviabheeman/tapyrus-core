@@ -1,5 +1,4 @@
 #for kernel libraries
-FROM linuxkit/kernel:4.15 as ksrc
 
 FROM --platform=$TARGETPLATFORM tapyrus/builder:v0.2.0 as builder
 ARG TARGETARCH
@@ -29,11 +28,6 @@ COPY --from=builder /tapyrus-core/dist/bin/* /usr/local/bin/
 WORKDIR /tapyrus-core
 COPY . .
 
-#kernel dev modules
-WORKDIR /kernel
-COPY --from=ksrc /kernel-dev.tar .
-RUN tar xf kernel-dev.tar
-
 #bpftrace
 ENV BPFTRACE_VERSION v0.15.0
 WORKDIR /bpftrace
@@ -53,16 +47,13 @@ ENV BPFTRACE_KERNEL_SOURCE=/kernel/usr/src/linux-headers
 # configure SSH for communication with Visual Studio 
 RUN mkdir -p /var/run/sshd
 
-#RUN echo 'root:root' | chpasswd \
-#    && sed -i 's/#PermitRootLogin prohibit-password/#PermitRootLogin yes/' /etc/ssh/sshd_config \
-#    && sed 's@session\s*required\s*pam_loginuid.so@session #optional pam_loginuid.so@g' -i /etc/pam.d/sshd
 
 ENV DATA_DIR='/var/lib/tapyrus' \
     CONF_DIR='/etc/tapyrus'
 RUN mkdir ${DATA_DIR} && mkdir ${CONF_DIR}
 
 # p2p port (Production/Development) rpc port (Production/Development)
-EXPOSE 2357 12383 2377 12381 22
+EXPOSE 2357 12383 2377 12381
 
 COPY entrypoint.sh /usr/local/bin/
 
