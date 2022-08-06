@@ -1,5 +1,5 @@
 #for kernel libraries
-FROM linuxkit/kernel:4.15 as ksrc
+FROM linuxkit/kernel:5.15.110-9c153b657f4a39023d01eb2ff395c58f1bb331da-amd64 as ksrc
 
 FROM --platform=$TARGETPLATFORM tapyrus/builder:v0.4.0 as builder
 ARG TARGETARCH
@@ -44,7 +44,7 @@ ENV DATA_DIR='/var/lib/tapyrus' \
 RUN mkdir ${DATA_DIR} && mkdir ${CONF_DIR}
 
 # p2p port (Production/Development) rpc port (Production/Development)
-EXPOSE 2357 12383 2377 12381 22
+EXPOSE 2357 12383 2377 12381
 
 COPY entrypoint.sh /usr/local/bin/
 
