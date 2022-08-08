@@ -25,6 +25,13 @@ FROM ubuntu:20.04
 
 COPY --from=builder /tapyrus-core/dist/bin/* /usr/local/bin/
 
+ENV TRACE_PACKAGES "cmake gdb gdbserver rsync zip openssh-server lldb ssh systemtap-sdt-dev bpfcc-tools python3-bpfcc build-essential libtool autotools-dev automake pkg-config bsdmainutils curl git ca-certificates ccache python3-zmq libevent-dev libboost-system-dev libboost-filesystem-dev libboost-chrono-dev libboost-test-dev libboost-thread-dev libdb5.3++-dev libminiupnpc-dev libzmq3-dev libqrencode-dev systemtap-sdt-dev "
+
+RUN apt-get update && \
+    apt-get install --no-install-recommends --no-upgrade -qq $TRACE_PACKAGES
+
+RUN apt-get install --no-install-recommends --no-upgrade -qq linux-headers-4.15.0-101-generic
+
 #source code
 WORKDIR /tapyrus-core
 COPY . .
