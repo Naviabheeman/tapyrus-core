@@ -20,6 +20,8 @@
 #include <deque>
 #include <limits>
 #include <set>
+#include <chrono>
+#include <thread>
 #include "leveldb/env.h"
 #include "leveldb/slice.h"
 #include "port/port.h"
@@ -547,7 +549,7 @@ class PosixEnv : public Env {
   }
 
   virtual void SleepForMicroseconds(int micros) {
-    usleep(micros);
+    std::this_thread::sleep_for(std::chrono::microseconds(micros));
   }
 
  private:

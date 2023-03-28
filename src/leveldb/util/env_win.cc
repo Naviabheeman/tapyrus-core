@@ -649,7 +649,7 @@ Status Win32Env::GetChildren(const std::string& dir, std::vector<std::string>* r
 
 void Win32Env::SleepForMicroseconds( int micros )
 {
-    ::Sleep((micros + 999) /1000);
+    std::this_thread::sleep_for(std::chrono::microseconds(micros));
 }
 
 
