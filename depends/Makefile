@@ -9,6 +9,9 @@ NO_WALLET ?=
 NO_UPNP ?=
 FALLBACK_DOWNLOAD_PATH ?= https://s3-ap-northeast-1.amazonaws.com/repo.tapyrus.chaintope.com
 
+C_STANDARD ?= c17
+CXX_STANDARD ?= c++17
+
 BUILD = $(shell ./config.guess)
 HOST ?= $(BUILD)
 PATCHES_PATH = $(BASEDIR)/patches

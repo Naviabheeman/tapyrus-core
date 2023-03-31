@@ -3,7 +3,7 @@
 cmake_minimum_required(VERSION 3.5)
 project(Tapyrus)
 
-set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD 17)
 
 # Default visibility is hidden on all targets.
 set(CMAKE_C_VISIBILITY_PRESET hidden)
