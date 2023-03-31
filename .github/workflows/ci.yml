@@ -180,7 +180,7 @@ jobs:
       - run: |
           source ./default-env.sh
           HOST=x86_64-apple-darwin \
-          PACKAGES="cmake imagemagick libcap-dev librsvg2-bin libz-dev libbz2-dev libtiff-tools python-dev python3-setuptools-git xorriso" \
+          PACKAGES="cmake imagemagick libcap-dev librsvg2-bin libz-dev libbz2-dev libtiff-tools python-dev python3-setuptools-git python3-setuptools xorriso" \
           OSX_SDK=11.0 \
           XCODE_VERSION=12.2 \
           XCODE_BUILD_ID=12B45b \
@@ -198,7 +198,7 @@ jobs:
       - run: |
           source ./default-env.sh
           HOST=x86_64-apple-darwin \
-          PACKAGES="cmake imagemagick libcap-dev librsvg2-bin libz-dev libbz2-dev libtiff-tools python-dev python3-setuptools-git xorriso" \
+          PACKAGES="cmake imagemagick libcap-dev librsvg2-bin libz-dev libbz2-dev libtiff-tools python-dev python3-setuptools-git python3-setuptools xorriso" \
           OSX_SDK=11.0 \
           XCODE_VERSION=12.2 \
           XCODE_BUILD_ID=12B45b \
