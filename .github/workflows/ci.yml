@@ -179,9 +179,9 @@ jobs:
           submodules: recursive
       - run: |
           source ./default-env.sh
-          HOST=x86_64-apple-darwin14 \
+          HOST=x86_64-apple-darwin \
           PACKAGES="cmake imagemagick libcap-dev librsvg2-bin libz-dev libbz2-dev libtiff-tools python-dev python3-setuptools-git xorriso" \
-          OSX_SDK=10.11 \
+          OSX_SDK=11.0 \
           XCODE_VERSION=12.2 \
           XCODE_BUILD_ID=12B45b \
           GOAL="all deploy" \
@@ -197,9 +197,9 @@ jobs:
           submodules: recursive
       - run: |
           source ./default-env.sh
-          HOST=x86_64-apple-darwin14 \
+          HOST=x86_64-apple-darwin \
           PACKAGES="cmake imagemagick libcap-dev librsvg2-bin libz-dev libbz2-dev libtiff-tools python-dev python3-setuptools-git xorriso" \
-          OSX_SDK=10.11 \
+          OSX_SDK=11.0 \
           XCODE_VERSION=12.2 \
           XCODE_BUILD_ID=12B45b \
           GOAL="all deploy" \
