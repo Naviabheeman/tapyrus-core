@@ -20,13 +20,14 @@ $(package)_config_opts_aarch64=address-model=64
 $(package)_config_opts_armv7a=address-model=32
 ifneq (,$(findstring clang,$($(package)_cxx)))
 $(package)_toolset_$(host_os)=clang
+$(package)_archiver_$(host_os)=$($(package)_ar)
 else
 $(package)_toolset_$(host_os)=gcc
+$(package)_archiver_darwin=$($(package)_libtool)
 endif
 $(package)_config_libraries=chrono,filesystem,system,thread,test
 $(package)_cxxflags=-std=c++17 -fvisibility=hidden
 $(package)_cxxflags_linux=-fPIC
-$(package)_cxxflags_x86_64=-fcf-protection=full
 endef
 
 define $(package)_preprocess_cmds
