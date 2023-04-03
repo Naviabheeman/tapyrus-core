@@ -1,5 +1,9 @@
 .NOTPARALLEL :
 
+# Pattern rule to print variables, e.g. make print-top_srcdir
+print-%: FORCE
+	@echo '$*'='$($*)'
+
 SOURCES_PATH ?= $(BASEDIR)/sources
 WORK_PATH = $(BASEDIR)/work
 BASE_CACHE ?= $(BASEDIR)/built
@@ -9,7 +13,7 @@ NO_WALLET ?=
 NO_UPNP ?=
 FALLBACK_DOWNLOAD_PATH ?= https://s3-ap-northeast-1.amazonaws.com/repo.tapyrus.chaintope.com
 
-C_STANDARD ?= c17
+C_STANDARD ?= c11
 CXX_STANDARD ?= c++17
 
 BUILD = $(shell ./config.guess)
@@ -17,7 +21,7 @@ HOST ?= $(BUILD)
 PATCHES_PATH = $(BASEDIR)/patches
 BASEDIR = $(CURDIR)
 HASH_LENGTH:=11
-DOWNLOAD_CONNECT_TIMEOUT:=10
+DOWNLOAD_CONNECT_TIMEOUT:=30
 DOWNLOAD_RETRIES:=3
 HOST_ID_SALT ?= salt
 BUILD_ID_SALT ?= salt
@@ -66,10 +70,6 @@ host_prefix=$($(host_arch)_$(host_os)_prefix)
 build_prefix=$(host_prefix)/native
 build_host=$(build)
 
-AT_$(V):=
-AT_:=@
-AT:=$(AT_$(V))
-
 all: install
 
 include hosts/$(host_os).mk
@@ -78,19 +78,13 @@ include builders/$(build_os).mk
 include builders/default.mk
 include packages/packages.mk
 
-build_id_string:=$(BUILD_ID_SALT)
-build_id_string+=$(shell $(build_CC) --version 2>/dev/null)
-build_id_string+=$(shell $(build_AR) --version 2>/dev/null)
-build_id_string+=$(shell $(build_CXX) --version 2>/dev/null)
-build_id_string+=$(shell $(build_RANLIB) --version 2>/dev/null)
-build_id_string+=$(shell $(build_STRIP) --version 2>/dev/null)
+build_id:=$(shell env CC='$(build_CC)' C_STANDARD='$(C_STANDARD)' CXX='$(build_CXX)' CXX_STANDARD='$(CXX_STANDARD)' AR='$(build_AR)' RANLIB='$(build_RANLIB)' STRIP='$(build_STRIP)' SHA256SUM='$(build_SHA256SUM)' DEBUG='$(DEBUG)' LTO='$(LTO)' ./gen_id '$(BUILD_ID_SALT)' 'GUIX_ENVIRONMENT=$(realpath $(GUIX_ENVIRONMENT))')
+$(host_arch)_$(host_os)_id:=$(shell env CC='$(host_CC)' C_STANDARD='$(C_STANDARD)' CXX='$(host_CXX)' CXX_STANDARD='$(CXX_STANDARD)' AR='$(host_AR)' RANLIB='$(host_RANLIB)' STRIP='$(host_STRIP)' SHA256SUM='$(build_SHA256SUM)' DEBUG='$(DEBUG)' LTO='$(LTO)' ./gen_id '$(HOST_ID_SALT)' 'GUIX_ENVIRONMENT=$(realpath $(GUIX_ENVIRONMENT))')
 
-$(host_arch)_$(host_os)_id_string:=$(HOST_ID_SALT)
-$(host_arch)_$(host_os)_id_string+=$(shell $(host_CC) --version 2>/dev/null)
-$(host_arch)_$(host_os)_id_string+=$(shell $(host_AR) --version 2>/dev/null)
-$(host_arch)_$(host_os)_id_string+=$(shell $(host_CXX) --version 2>/dev/null)
-$(host_arch)_$(host_os)_id_string+=$(shell $(host_RANLIB) --version 2>/dev/null)
-$(host_arch)_$(host_os)_id_string+=$(shell $(host_STRIP) --version 2>/dev/null)
+ifneq ($(strip $(FORCE_USE_SYSTEM_CLANG)),)
+build_id_string+=system_clang
+$(host_arch)_$(host_os)_id_string+=system_clang
+endif
 
 qt_packages_$(NO_QT) = $(qt_packages) $(qt_$(host_os)_packages) $(qt_$(host_arch)_$(host_os)_packages)
 wallet_packages_$(NO_WALLET) = $(wallet_packages)
@@ -107,30 +101,38 @@ all_packages = $(packages) $(native_packages)
 
 meta_depends = Makefile funcs.mk builders/default.mk hosts/default.mk hosts/$(host_os).mk builders/$(build_os).mk
 
+$(host_arch)_$(host_os)_native_binutils?=$($(host_os)_native_binutils)
+
 $(host_arch)_$(host_os)_native_toolchain?=$($(host_os)_native_toolchain)
 
 include funcs.mk
 
+binutils_path=$($($(host_arch)_$(host_os)_native_binutils)_prefixbin)
+ifeq ($(strip $(FORCE_USE_SYSTEM_CLANG)),)
 toolchain_path=$($($(host_arch)_$(host_os)_native_toolchain)_prefixbin)
+else
+toolchain_path=
+endif
+
 final_build_id_long+=$(shell $(build_SHA256SUM) config.site.in)
 final_build_id+=$(shell echo -n "$(final_build_id_long)" | $(build_SHA256SUM) | cut -c-$(HASH_LENGTH))
 $(host_prefix)/.stamp_$(final_build_id): $(native_packages) $(packages)
-	$(AT)rm -rf $(@D)
-	$(AT)mkdir -p $(@D)
-	$(AT)echo copying packages: $^
-	$(AT)echo to: $(@D)
-	$(AT)cd $(@D); $(foreach package,$^, tar xf $($(package)_cached); )
-	$(AT)touch $@
+	rm -rf $(@D)
+	mkdir -p $(@D)
+	echo copying packages: $^
+	echo to: $(@D)
+	cd $(@D); $(foreach package,$^, tar xf $($(package)_cached); )
+	touch $@
 
 $(host_prefix)/share/config.site : config.site.in $(host_prefix)/.stamp_$(final_build_id)
-	$(AT)@mkdir -p $(@D)
-	$(AT)sed -e 's|@HOST@|$(host)|' \
+	@mkdir -p $(@D)
+	sed -e 's|@HOST@|$(host)|' \
             -e 's|@CC@|$(toolchain_path)$(host_CC)|' \
             -e 's|@CXX@|$(toolchain_path)$(host_CXX)|' \
-            -e 's|@AR@|$(toolchain_path)$(host_AR)|' \
-            -e 's|@RANLIB@|$(toolchain_path)$(host_RANLIB)|' \
-            -e 's|@NM@|$(toolchain_path)$(host_NM)|' \
-            -e 's|@STRIP@|$(toolchain_path)$(host_STRIP)|' \
+            -e 's|@AR@|$(binutils_path)$(host_AR)|' \
+            -e 's|@RANLIB@|$(binutils_path)$(host_RANLIB)|' \
+            -e 's|@NM@|$(binutils_path)$(host_NM)|' \
+            -e 's|@STRIP@|$(binutils_path)$(host_STRIP)|' \
             -e 's|@build_os@|$(build_os)|' \
             -e 's|@host_os@|$(host_os)|' \
             -e 's|@CFLAGS@|$(strip $(host_CFLAGS) $(host_$(release_type)_CFLAGS))|' \
@@ -143,7 +145,7 @@ $(host_prefix)/share/config.site : config.site.in $(host_prefix)/.stamp_$(final_
             -e 's|@no_upnp@|$(NO_UPNP)|' \
             -e 's|@debug@|$(DEBUG)|' \
             $< > $@
-	$(AT)touch $@
+	touch $@
 
 
 define check_or_remove_cached
@@ -188,4 +190,9 @@ download-win:
 	@$(MAKE) -s HOST=x86_64-w64-mingw32 download-one
 download: download-osx download-linux download-win
 
+$(foreach package,$(all_packages),$(eval $(call ext_add_stages,$(package))))
+
 .PHONY: install cached clean clean-all download-one download-osx download-linux download-win download check-packages check-sources
+
+.PHONY: FORCE
+$(V).SILENT:
