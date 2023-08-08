@@ -9,11 +9,7 @@
 
 import ctypes
 from io import BytesIO
-# Test will be skipped if we don't have bcc installed
-try:
-    from bcc import BPF, USDT # type: ignore[import]
-except ImportError:
-    pass
+from bcc import BPF, USDT
 from test_framework.messages import msg_version
 from test_framework.mininode import P2PInterface
 from test_framework.test_framework import BitcoinTestFramework
@@ -76,7 +72,7 @@ int trace_outbound_message(struct pt_regs *ctx) {
     bpf_usdt_readarg_p(6, ctx, &msg.msg, MIN(msg.msg_size, MAX_MSG_DATA_LENGTH));
     outbound_messages.perf_submit(ctx, &msg, sizeof(msg));
     return 0;
-};
+}
 """
 
 
@@ -103,10 +99,10 @@ class NetTracepointTest(BitcoinTestFramework):
 
         self.log.info(
             "hook into the net:inbound_message and net:outbound_message tracepoints")
-        ctx = USDT(path=str(self.options.bitcoind))
-        ctx.enable_probe(probe="net:inbound_message",
+        ctx = USDT(pid=self.nodes[0].process.pid)
+        ctx.enable_probe(probe="inbound_message",
                          fn_name="trace_inbound_message")
-        ctx.enable_probe(probe="net:outbound_message",
+        ctx.enable_probe(probe="outbound_message",
                          fn_name="trace_outbound_message")
         bpf = BPF(text=net_tracepoints_program, usdt_contexts=[ctx], debug=0)
 
