@@ -59,7 +59,7 @@ int trace_inbound_message(struct pt_regs *ctx) {
     bpf_usdt_readarg_p(6, ctx, &msg.msg, MIN(msg.msg_size, MAX_MSG_DATA_LENGTH));
     inbound_messages.perf_submit(ctx, &msg, sizeof(msg));
     return 0;
-}
+};
 
 BPF_PERF_OUTPUT(outbound_messages);
 int trace_outbound_message(struct pt_regs *ctx) {
@@ -72,7 +72,7 @@ int trace_outbound_message(struct pt_regs *ctx) {
     bpf_usdt_readarg_p(6, ctx, &msg.msg, MIN(msg.msg_size, MAX_MSG_DATA_LENGTH));
     outbound_messages.perf_submit(ctx, &msg, sizeof(msg));
     return 0;
-}
+};
 """
 
 

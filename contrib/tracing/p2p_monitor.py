@@ -52,7 +52,7 @@ int trace_inbound_message(struct pt_regs *ctx) {
 
     inbound_messages.perf_submit(ctx, &msg, sizeof(msg));
     return 0;
-};
+}
 
 int trace_outbound_message(struct pt_regs *ctx) {
     struct p2p_message msg = {};
@@ -65,7 +65,7 @@ int trace_outbound_message(struct pt_regs *ctx) {
 
     outbound_messages.perf_submit(ctx, &msg, sizeof(msg));
     return 0;
-};
+}
 """
 
 
