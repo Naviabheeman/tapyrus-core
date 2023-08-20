@@ -92,6 +92,10 @@ User-Space, Statically Defined Tracing (USDT) dependencies:
 
     sudo apt install systemtap-sdt-dev
 
+User-Space, Statically Defined Tracing (USDT) dependencies:
+
+    sudo apt install systemtap-sdt-dev
+
 #### GUI
 
 GUI dependencies:
@@ -118,6 +122,10 @@ built by default.
 Build requirements:
 
     sudo dnf install gcc-c++ libtool make autoconf automake python3
+
+User-Space, Statically Defined Tracing (USDT) dependencies:
+
+    sudo dnf install systemtap
 
 User-Space, Statically Defined Tracing (USDT) dependencies:
 
