@@ -32,6 +32,7 @@ from test_framework.util import (
     hex_str_to_bytes,
     wait_until,
 )
+from test_framework.address import byte_to_base58
 
 class MempoolAcceptanceTest(BitcoinTestFramework):
     def set_test_params(self):
@@ -90,7 +91,7 @@ class MempoolAcceptanceTest(BitcoinTestFramework):
             tx.deserialize(BytesIO(hex_str_to_bytes(signed_raw_tx)))
             package.insert(x-1, tx)
             prevtx  = tx
-        [print(x.rehash(), x) for x in package]
+        [x.rehash() for x in package]
         return package
 
     def run_test(self):
@@ -364,7 +365,7 @@ class MempoolAcceptanceTest(BitcoinTestFramework):
         package = self.create_package(26)
         raw_package = [bytes_to_hex_str(x.serialize()) for x in package]
 
-        assert_raises_rpc_error(-8, "Too many transactions in package", self.nodes[0].testmempoolaccept, raw_package)
+        assert_raises_rpc_error(-8, "Too many transactions in package", node.testmempoolaccept, raw_package)
 
         # package with txs spending the same input is rejected
         package = self.create_package(5)
@@ -417,8 +418,84 @@ class MempoolAcceptanceTest(BitcoinTestFramework):
         raw_package = [bytes_to_hex_str(x.serialize()) for x in package]
 
         self.check_mempool_result(
-            result_expected={ 'txid': package[0].hashMalFix, 'allowed': True },
+            result_expected={ 'allowed': True },
             rawtxs=raw_package,
+        )
+
+        # test colored coins in package
+
+        # Reissuable
+        new_address = node.getnewaddress()
+        pubkeyhash = hash160(hex_str_to_bytes(self.nodes[0].getaddressinfo(new_address)["pubkey"]))
+        utxos = node.listunspent()
+        colorid1 = node.getcolor(1, utxos[0]['scriptPubKey'])
+        cp2pkh_address1 = byte_to_base58(pubkeyhash, hex_str_to_bytes(colorid1), 112)
+
+        # issue
+        issue_tx_1 = node.signrawtransactionwithwallet(node.createrawtransaction(
+                inputs=[{'txid': utxos[0]['txid'], 'vout': utxos[0]['vout']}],
+                outputs=[{node.getnewaddress(): 10}, {node.getnewaddress() : 39}, { cp2pkh_address1 : 1000}],
+            ), [], "ALL", self.options.scheme)['hex']
+        tx_1 = CTransaction()
+        tx_1.deserialize(BytesIO(hex_str_to_bytes(issue_tx_1)))
+        tx_1.rehash()
+        # spend
+        spend_tx_1 = node.signrawtransactionwithwallet(node.createrawtransaction(
+                inputs=[{'txid': tx_1.hashMalFix, 'vout': 2}],
+                outputs=[{node.getnewaddress("", colorid1): 200}],
+            ), [], "ALL", self.options.scheme)['hex']
+
+        # Non-Reissuable
+        colorid2 = node.getcolor(2, utxos[1]['txid'], utxos[1]['vout'])
+        cp2pkh_address2 = byte_to_base58(pubkeyhash, hex_str_to_bytes(colorid2), 112)
+        # issue
+        issue_tx_2 = node.signrawtransactionwithwallet(node.createrawtransaction(
+                inputs=[{'txid': utxos[1]['txid'], 'vout': utxos[1]['vout']}],
+                outputs=[{node.getnewaddress(): 10}, {node.getnewaddress() : 39}, { cp2pkh_address2 : 100}],
+            ), [], "ALL", self.options.scheme)['hex']
+        tx_2 = CTransaction()
+        tx_2.deserialize(BytesIO(hex_str_to_bytes(issue_tx_2)))
+        tx_2.rehash()
+        # spend
+        spend_tx_2 = node.signrawtransactionwithwallet(node.createrawtransaction(
+                inputs=[{'txid': tx_2.hashMalFix, 'vout': 2}],
+                outputs=[{node.getnewaddress("", colorid2): 50}],
+            ), [], "ALL", self.options.scheme)['hex']
+
+        # NFT
+        colorid3 = node.getcolor(3, utxos[3]['txid'], utxos[3]['vout'])
+        cp2pkh_address3 = byte_to_base58(pubkeyhash, hex_str_to_bytes(colorid3), 112)
+        # issue
+        issue_tx_3 = node.signrawtransactionwithwallet(node.createrawtransaction(
+                inputs=[{'txid': utxos[3]['txid'], 'vout': utxos[3]['vout']}],
+                outputs=[{node.getnewaddress(): 10}, {node.getnewaddress() : 39}, { cp2pkh_address3 : 1}],
+            ), [], "ALL", self.options.scheme)['hex']
+        tx_3 = CTransaction()
+        tx_3.deserialize(BytesIO(hex_str_to_bytes(issue_tx_3)))
+        tx_3.rehash()
+        # spend
+        spend_tx_3 = node.signrawtransactionwithwallet(node.createrawtransaction(
+                inputs=[{'txid': tx_3.hashMalFix, 'vout': 2}],
+                outputs=[{node.getnewaddress("", colorid3): 1}],
+            ), [], "ALL", self.options.scheme)['hex']
+
+        package = [issue_tx_1, issue_tx_2, issue_tx_3, spend_tx_1, spend_tx_2, spend_tx_3]
+
+        txids = []
+        for i in package:
+            packagetx = CTransaction()
+            packagetx.deserialize(BytesIO(hex_str_to_bytes(i)))
+            packagetx.rehash()
+            txids.append(packagetx.hashMalFix)
+
+        self.check_mempool_result(
+            result_expected={ txids[0]: {'allowed': True},
+                                            txids[1]: {'allowed': True},
+                                            txids[2]: {'allowed': True},
+                                            txids[3]: {'allowed': True},
+                                            txids[4]: {'allowed': True},
+                                            txids[5]: {'allowed': True}},
+            rawtxs=package,
         )
 
 if __name__ == '__main__':

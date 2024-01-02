@@ -901,7 +901,7 @@ CCoinsViewMemPool::CCoinsViewMemPool(CCoinsView* baseIn, const CTxMemPool& mempo
 bool CCoinsViewMemPool::GetCoin(const COutPoint &outpoint, Coin &coin) const {
     // Check to see if the inputs are made available by another tx in the package.
     // These Coins would not be available in the underlying CoinsView.
-    if (auto it = packagepool.find(outpoint); it != packagepool.end()) {
+    if (auto it = packagePool.find(outpoint); it != packagePool.end()) {
         coin = it->second;
         return true;
     }

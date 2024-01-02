@@ -49,14 +49,6 @@ struct LockPoints
     LockPoints() : height(0), time(0), maxInputBlock(nullptr) { }
 };
 
-
-enum class ValidationContext {
-    TRANSACTION,
-    BLOCK,
-    INDEX,
-    PACKAGE
-};
-
 class CTxMemPool;
 
 /** \class CTxMemPoolEntry
@@ -168,6 +160,7 @@ struct CTxMempoolAcceptanceOptions {
     std::vector<CTransactionRef> txnReplaced;
     std::vector<COutPoint> coins_to_uncache;
     std::vector<COutPoint> missingInputs;
+    std::vector<const CTxMemPoolEntry > validPool;
 
     CTxMempoolAcceptanceOptions():context(ValidationContext::TRANSACTION), flags(MempoolAcceptanceFlags::NONE),nAbsurdFee(0), nAcceptTime(0){}
 };

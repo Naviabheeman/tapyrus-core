@@ -40,8 +40,8 @@ bool CheckPackage(const Package& txns, CValidationState& state);
 bool TestPackageAcceptance(const Package& package,
                                   CValidationState& state,
                                   PackageValidationState& results,
-                                  std::vector<const CTxMemPoolEntry >& validPool)
+                                  std::vector<const CTxMemPoolEntry >& validPool);
 
-bool SubmitPackage(std::vector<const CTxMemPoolEntry >& validPool, CValidationState& state);
+bool SubmitPackageToMempool(std::vector<const CTxMemPoolEntry >& validPool, CValidationState& state);
 
 #endif // TAPYRUS_POLICY_PACKAGES_H

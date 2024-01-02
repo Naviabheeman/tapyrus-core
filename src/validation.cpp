@@ -764,14 +764,16 @@ bool TestPackageAcceptance(const Package& package,
                                   PackageValidationState& results,
                                   std::vector<const CTxMemPoolEntry >& validPool)
 {
+    CTxMemPool& pool = mempool;
     assert(std::all_of(package.cbegin(), package.cend(),
-        [&mempool](const auto& tx){
+        [&pool](const auto& tx){
             return !mempool.exists(tx->GetHashMalFix());
     }));
 
     bool all_valid = true;
     bool test_accept_res = false;
-    CCoinsViewMemPool viewMemPool(pcoinsTip.get(), mempool);
+    CTxMempoolAcceptanceOptions opt;
+    opt.flags = MempoolAcceptanceFlags::TEST_ONLY;
 
     if(!CheckPackage(package, state))
         return false;
@@ -780,7 +782,7 @@ bool TestPackageAcceptance(const Package& package,
     for(auto &tx : package) {
         {
             LOCK(::cs_main);
-            test_accept_res = AcceptToMemoryPool(ValidationContext::PACKAGE, mempool, state, tx, validPool, &state.missingInputs, nullptr, true, 0, true);
+            test_accept_res = AcceptToMemoryPool(tx, opt);
         }
 
         results.emplace(tx->GetHashMalFix(), state);
@@ -793,25 +795,26 @@ bool TestPackageAcceptance(const Package& package,
 void SubmitToMempool(std::vector<const CTxMemPoolEntry >& validPool, CValidationState& state)
 {
     for(auto &entry : validPool) {
+        CTransactionRef tx(&entry.GetTx());
         {
             // Store transaction in mempool if validation succeeded
             LOCK(::cs_main);
-            mempool.addUnchecked(entry.tx->GetHashMalFix(), entry, false);
+            mempool.addUnchecked(tx->GetHashMalFix(), entry, false);
         }
 
         // trim mempool and check if tx was trimmed
         LimitMempoolSize(mempool, gArgs.GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000, gArgs.GetArg("-mempoolexpiry", DEFAULT_MEMPOOL_EXPIRY) * 60 * 60);
-        if (!mempool.exists(hash))
-            return state.DoS(0, false, REJECT_INSUFFICIENTFEE, "mempool full");
+        if (!mempool.exists(tx->GetHashMalFix()))
+            state.DoS(0, false, REJECT_INSUFFICIENTFEE, "mempool full");
 
-        GetMainSignals().TransactionAddedToMempool(entry.tx);
+        GetMainSignals().TransactionAddedToMempool(tx);
     }
 }
 
 
 static bool AcceptToMemoryPoolWorker(const CTransactionRef &ptx, CTxMempoolAcceptanceOptions& opt)
 {
-    const CTransaction& tx = opt.tx;
+    const CTransaction& tx = *ptx;
     const uint256 hash = tx.GetHashMalFix();
     AssertLockHeld(cs_main);
 
@@ -823,7 +826,7 @@ static bool AcceptToMemoryPoolWorker(const CTransactionRef &ptx, CTxMempoolAccep
     // missing inputs is a vector for package validation
     opt.missingInputs.clear();
 
-    if (!CheckTransaction(tx, acceptanceConfig.state))
+    if (!CheckTransaction(tx, state))
         return false; // state filled in by CheckTransaction
 
     // Coinbase is only valid in a block, not as a loose transaction
@@ -873,7 +876,7 @@ static bool AcceptToMemoryPoolWorker(const CTransactionRef &ptx, CTxMempoolAccep
             return false;
 
         //if there are colored coins in the output verify their colorids
-        if(!CheckColorIdentifierValidity(tx, acceptanceConfig.state, view))
+        if(!CheckColorIdentifierValidity(tx, state, view))
             return state.DoS(0, false, REJECT_COLORID, "invalid-colorid");
 
         // Bring the best block into scope
@@ -1135,7 +1138,7 @@ static bool AcceptToMemoryPoolWorker(const CTransactionRef &ptx, CTxMempoolAccep
         // There is a similar check in CreateNewBlock() to prevent creating
         // invalid blocks (using TestBlockValidity), however allowing such
         // transactions into the mempool can be exploited as a DoS attack.
-        if (!CheckInputsFromMempoolAndCache(tx, state, view, pool, SCRIPT_VERIFY_NONE, true, txdata)) {
+        if (!CheckInputsFromMempoolAndCache(opt.context, tx, opt.state, view, pool, SCRIPT_VERIFY_NONE, true, txdata)) {
             return error("%s: BUG! PLEASE REPORT THIS! CheckInputs failed against latest-block but not STANDARD flags %s, %s",
                     __func__, hash.ToString(), FormatStateMessage(state));
         }
@@ -1147,8 +1150,8 @@ static bool AcceptToMemoryPoolWorker(const CTransactionRef &ptx, CTxMempoolAccep
 
         // is validation of the package tx was successful remember its mempoolentry
         // if submission is needed this list is used otherwise it is unused
-        if(context == ValidationContext::PACKAGE)
-            validPool.push_back(entry);
+        if(opt.context == ValidationContext::PACKAGE)
+            opt.validPool.push_back(entry);
 
         if (opt.flags == MempoolAcceptanceFlags::TEST_ONLY) {
             // Tx was accepted, but not added
