@@ -762,22 +762,19 @@ static unsigned int GetBlockScriptFlags(const CBlockIndex* pindex) {
 bool TestPackageAcceptance(const Package& package,
                                   CValidationState& state,
                                   PackageValidationState& results,
-                                  std::vector<const CTxMemPoolEntry >& validPool)
+                                  std::vector<const CTxMemPoolEntry >* validPool)
 {
-    CTxMemPool& pool = mempool;
-    assert(std::all_of(package.cbegin(), package.cend(),
-        [&pool](const auto& tx){
-            return !mempool.exists(tx->GetHashMalFix());
-    }));
-
     bool all_valid = true;
     bool test_accept_res = false;
     CTxMempoolAcceptanceOptions opt;
+    opt.context = ValidationContext::PACKAGE;
     opt.flags = MempoolAcceptanceFlags::TEST_ONLY;
+    opt.submitPool = validPool;
 
     if(!CheckPackage(package, state))
         return false;
 
+    opt.package_pool = new CCoinsViewMemPool(pcoinsTip.get(), mempool);
     // testmempool acceptance first
     for(auto &tx : package) {
         {
@@ -785,9 +782,13 @@ bool TestPackageAcceptance(const Package& package,
             test_accept_res = AcceptToMemoryPool(tx, opt);
         }
 
-        results.emplace(tx->GetHashMalFix(), state);
+        opt.state.missingInputs = opt.missingInputs.size() > 0;
+        results.emplace(tx->GetHashMalFix(), opt.state);
         all_valid &= test_accept_res;
     }
+
+    delete opt.package_pool;
+    opt.package_pool = nullptr;
 
     return all_valid;
 }
@@ -810,7 +811,6 @@ void SubmitToMempool(std::vector<const CTxMemPoolEntry >& validPool, CValidation
         GetMainSignals().TransactionAddedToMempool(tx);
     }
 }
-
 
 static bool AcceptToMemoryPoolWorker(const CTransactionRef &ptx, CTxMempoolAcceptanceOptions& opt)
 {
@@ -869,7 +869,11 @@ static bool AcceptToMemoryPoolWorker(const CTransactionRef &ptx, CTxMempoolAccep
         CCoinsViewCache view(&dummy);
 
         CCoinsViewMemPool viewMemPool(pcoinsTip.get(), pool);
-        view.SetBackend(viewMemPool);
+
+        if(opt.context == ValidationContext::PACKAGE)
+            view.SetBackend(*opt.package_pool);
+        else
+            view.SetBackend(viewMemPool);
 
         // do all inputs exist?
         if(!DoAllInputsExist(tx, state, opt, view))
@@ -1148,10 +1152,14 @@ static bool AcceptToMemoryPoolWorker(const CTransactionRef &ptx, CTxMempoolAccep
             return false;
         }
 
-        // is validation of the package tx was successful remember its mempoolentry
+        // if validation of the package tx was successful remember its mempoolentry
         // if submission is needed this list is used otherwise it is unused
-        if(opt.context == ValidationContext::PACKAGE)
-            opt.validPool.push_back(entry);
+        if(opt.context == ValidationContext::PACKAGE) {
+            if(opt.package_pool)
+                opt.package_pool->AddToPackagePool(ptx);
+            if(opt.submitPool)
+                opt.submitPool->push_back(entry);
+        }
 
         if (opt.flags == MempoolAcceptanceFlags::TEST_ONLY) {
             // Tx was accepted, but not added

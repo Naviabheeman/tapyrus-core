@@ -1192,9 +1192,11 @@ static UniValue testmempoolaccept(const JSONRPCRequest& request)
             "  \"reject-reason\"  (string) Rejection string (only present when 'allowed' is false)\n"
             "[                   (array) The result of the mempool acceptance test for each raw transaction in the input array. Length is equal to the number of input transactions."
             " {\n"
-            "  \"txid\"                   (string) The transaction id in hex\n"
-            "  \"allowed\"            (boolean) If the mempool allows this tx to be inserted\n"
-            "  \"reject-reason\"  (string) Rejection string (only present when 'allowed' is false)\n"
+            "  \"<txid>:\"                  (string) The transaction id in hex\n"
+            "   {\n"
+            "    \"allowed\"               (boolean) If the mempool allows this tx to be inserted\n"
+            "    \"reject-reason\"     (string) Rejection string (only present when 'allowed' is false)\n"
+            "   }\n"
             " }\n"
             "]\n"
             "\nExamples:\n"
@@ -1224,7 +1226,7 @@ static UniValue testmempoolaccept(const JSONRPCRequest& request)
             throw JSONRPCError(RPC_DESERIALIZATION_ERROR,
                                 "TX decode failed: " + rawtx.get_str() + " Make sure the tx has at least one input.");
         }
-        package.insert(MakeTransactionRef(std::move(mtx)));
+        package.push_back(MakeTransactionRef(std::move(mtx)));
     }
 
     if(package.size() != raw_transactions.size()){
@@ -1237,41 +1239,32 @@ static UniValue testmempoolaccept(const JSONRPCRequest& request)
         max_raw_tx_fee = 0;
     }
 
-    /*
-    CTxMempoolAcceptanceOptions opt;
-    opt.flags = MempoolAcceptanceFlags::TEST_ONLY;
-    bool accept;
-    {
-        LOCK(cs_main);
-        accept = AcceptToMemoryPool(std::move(tx), opt);
-    }
-    */
     CValidationState state;
     PackageValidationState pkg_results;
-    std::vector<const CTxMemPoolEntry> submitPool;
 
     bool success = false;
-    success = TestPackageAcceptance(package, state, pkg_results, submitPool);
+    success = TestPackageAcceptance(package, state, pkg_results);
 
     UniValue result(UniValue::VOBJ);
+    UniValue result_0(UniValue::VOBJ);
 
-    if(state.IsInvalid() || state.IsError()) {
+    if(success && ArePackageTransactionsAccepted(pkg_results)) {
+        for (const auto& r : pkg_results) {
+            result_0.pushKV("allowed", true);
+            result.pushKV(r.first.GetHex(), result_0);
+        }
+    }
+    else if(state.IsInvalid() || state.IsError()) {
         result.pushKV("allowed", false);
-        std::stringstream ss;
-        ss << state.GetRejectCode() << ": " <<  state.GetRejectReason() << " " << state.GetDebugMessage();
-        result.pushKV("reject-reason", ss.str());
-    } else if(success && package.size() == 1) {
-        result.pushKV("allowed", true);
+        result.pushKV("reject-reason", strprintf("%i: %s", state.GetRejectCode(), state.GetRejectReason()));
     } else {
         for (const auto& r : pkg_results) {
-            UniValue result_0(UniValue::VOBJ);
-            if(state.IsInvalid() || state.IsError()) {
+            if(r.second.IsInvalid() || r.second.IsError()) {
                 result_0.pushKV("allowed", false);
-                std::stringstream ss;
-                ss <<r.second.Describe();
-                result_0.pushKV("reject-reason", ss.str());
+                result_0.pushKV("reject-reason", strprintf("%i: %s", r.second.GetRejectCode(), r.second.GetRejectReason()));
             } else if (r.second.missingInputs && r.second.IsValid()) {
-                result_0.pushKV("reject-reason", r.second.Describe());
+                result_0.pushKV("allowed", false);
+                result_0.pushKV("reject-reason", "missing-inputs");
             } else
                 result_0.pushKV("allowed", true);
             result.pushKV(r.first.GetHex(), result_0);
@@ -1287,18 +1280,12 @@ static UniValue submitpackage(const JSONRPCRequest& request)
         "submitpackage \"[rawtx1, rawtx2]\" \n"
         "\nSubmit a package of raw transactions (serialized, hex-encoded) to local node \n"
         "\nArguments:\n"
-        "1. transaction_hex                        (array, required) Array of raw transactions\n"
+        "1. transaction_hex                        (array, required) An array of hex strings of raw transactions.\n"
         "2. allowhighfees                            (boolean, optional, default=false) Allow high fees\n"
         "\nResult:\n"
-        "  \"allowed\"            (boolean) If the mempool allows this tx to be inserted\n"
-        "  \"reject-reason\"  (string) Rejection string (only present when 'allowed' is false)\n"
-        "[                                                      (array) The result of the mempool acceptance test for each raw transaction in the input array. Length is equal to the number of input transactions.\n"
-        " {\n"
-        "  \"txid\"                     (string) The transaction id in hex\n"
-        "  \"allowed\"               (boolean) If the mempool allows this tx to be inserted\n"
-        "  \"reject-reason\"     (string) Rejection string (only present when 'allowed' is false)\n"
-        " }\n"
-        "]\n"
+        "   {\n"
+        "    \"allowed\"               (boolean) If submitting all transaction was successful \n"
+        "   }\n"
         "\nExamples:\n"
         "\nCreate a transaction\n"
         + HelpExampleCli("createrawtransaction", "\"[{\\\"txid\\\" : \\\"mytxid\\\",\\\"vout\\\":0}]\" \"{\\\"myaddress\\\":0.01}\"") +
@@ -1325,7 +1312,7 @@ static UniValue submitpackage(const JSONRPCRequest& request)
             throw JSONRPCError(RPC_DESERIALIZATION_ERROR,
                                 "TX decode failed: " + rawtx.get_str() + " Make sure the tx has at least one input.");
         }
-        package.insert(MakeTransactionRef(std::move(mtx)));
+        package.push_back(MakeTransactionRef(std::move(mtx)));
     }
 
     if(package.size() != raw_transactions.size()){
@@ -1343,35 +1330,15 @@ static UniValue submitpackage(const JSONRPCRequest& request)
     std::vector<const CTxMemPoolEntry> submitPool;
 
     bool success = false;
-    success = TestPackageAcceptance(package, state, pkg_results, submitPool);
+    success = TestPackageAcceptance(package, state, pkg_results, &submitPool);
+
+    if(success && ArePackageTransactionsAccepted(pkg_results))
+    {
+        success = SubmitPackageToMempool(submitPool, state);
+    }
 
     UniValue result(UniValue::VOBJ);
-    if(success) {
-        SubmitPackageToMempool(submitPool, state);
-    }
-
-    if(state.IsInvalid() || state.IsError()) {
-        result.pushKV("allowed", false);
-        std::stringstream ss;
-        ss << state.GetRejectCode() << ": " <<  state.GetRejectReason() << " " << state.GetDebugMessage();
-        result.pushKV("reject-reason", ss.str());
-    } else if(success && package.size() == 1) {
-        result.pushKV("allowed", true);
-    } else {
-        for (const auto& r : pkg_results) {
-            UniValue result_0(UniValue::VOBJ);
-            if(state.IsInvalid() || state.IsError()) {
-                result_0.pushKV("allowed", false);
-                std::stringstream ss;
-                ss <<r.second.Describe();
-                result_0.pushKV("reject-reason", ss.str());
-            } else if (r.second.missingInputs && r.second.IsValid()) {
-                result_0.pushKV("reject-reason", r.second.Describe());
-            } else
-                result_0.pushKV("allowed", true);
-            result.pushKV(r.first.GetHex(), result_0);
-        }
-    }
+    result.pushKV("allowed", success);
     return result;
 }
 
