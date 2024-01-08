@@ -841,13 +841,17 @@ struct CTxMempoolAcceptanceOptions {
     CAmount nAbsurdFee;
     CValidationState state;
     int64_t nAcceptTime;
-    CCoinsViewMemPool* package_pool;
+    CCoinsViewMemPool* mempool_view;
     std::vector<CTransactionRef> txnReplaced;
     std::vector<COutPoint> coins_to_uncache;
     std::vector<COutPoint> missingInputs;
     std::vector<const CTxMemPoolEntry >* submitPool;
 
-    CTxMempoolAcceptanceOptions():context(ValidationContext::TRANSACTION), flags(MempoolAcceptanceFlags::NONE),nAbsurdFee(0), nAcceptTime(0), package_pool(nullptr){}
+    CTxMempoolAcceptanceOptions();
+    ~CTxMempoolAcceptanceOptions() {
+        delete mempool_view;
+        mempool_view = nullptr;
+    }
 };
 
 #endif // BITCOIN_TXMEMPOOL_H

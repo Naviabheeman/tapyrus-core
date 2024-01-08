@@ -45,6 +45,7 @@
 #include <validationinterface.h>
 #include <warnings.h>
 #include <xfieldhistory.h>
+#include <core_io.h>
 
 #include <future>
 #include <thread>
@@ -366,8 +367,7 @@ bool TestLockPointValidity(const LockPoints* lp)
     // LockPoints still valid
     return true;
 }
-
-bool CheckSequenceLocks(const CTransaction &tx, int flags, LockPoints* lp, bool useExistingLockPoints)
+bool CheckSequenceLocks(const CTransaction &tx, int flags, CCoinsViewMemPool& viewMemPool, LockPoints* lp, bool useExistingLockPoints)
 {
     AssertLockHeld(cs_main);
     AssertLockHeld(mempool.cs);
@@ -393,7 +393,6 @@ bool CheckSequenceLocks(const CTransaction &tx, int flags, LockPoints* lp, bool 
     }
     else {
         // pcoinsTip contains the UTXO set for chainActive.Tip()
-        CCoinsViewMemPool viewMemPool(pcoinsTip.get(), mempool);
         std::vector<int> prevheights;
         prevheights.resize(tx.vin.size());
         for (size_t txinIndex = 0; txinIndex < tx.vin.size(); txinIndex++) {
@@ -774,10 +773,10 @@ bool TestPackageAcceptance(const Package& package,
     if(!CheckPackage(package, state))
         return false;
 
-    opt.package_pool = new CCoinsViewMemPool(pcoinsTip.get(), mempool);
     // testmempool acceptance first
     for(auto &tx : package) {
         {
+            opt.state = CValidationState();
             LOCK(::cs_main);
             test_accept_res = AcceptToMemoryPool(tx, opt);
         }
@@ -786,9 +785,6 @@ bool TestPackageAcceptance(const Package& package,
         results.emplace(tx->GetHashMalFix(), opt.state);
         all_valid &= test_accept_res;
     }
-
-    delete opt.package_pool;
-    opt.package_pool = nullptr;
 
     return all_valid;
 }
@@ -800,6 +796,7 @@ void SubmitToMempool(std::vector<const CTxMemPoolEntry >& validPool, CValidation
         {
             // Store transaction in mempool if validation succeeded
             LOCK(::cs_main);
+            LOCK(mempool.cs);
             mempool.addUnchecked(tx->GetHashMalFix(), entry, false);
         }
 
@@ -868,12 +865,7 @@ static bool AcceptToMemoryPoolWorker(const CTransactionRef &ptx, CTxMempoolAccep
         CCoinsView dummy;
         CCoinsViewCache view(&dummy);
 
-        CCoinsViewMemPool viewMemPool(pcoinsTip.get(), pool);
-
-        if(opt.context == ValidationContext::PACKAGE)
-            view.SetBackend(*opt.package_pool);
-        else
-            view.SetBackend(viewMemPool);
+        view.SetBackend(*opt.mempool_view);
 
         // do all inputs exist?
         if(!DoAllInputsExist(tx, state, opt, view))
@@ -895,7 +887,7 @@ static bool AcceptToMemoryPoolWorker(const CTransactionRef &ptx, CTxMempoolAccep
         // Must keep pool.cs for this unless we change CheckSequenceLocks to take a
         // CoinsViewCache instead of create its own
         LockPoints lp;
-        if (!CheckSequenceLocks(tx, STANDARD_LOCKTIME_VERIFY_FLAGS, &lp))
+        if (!CheckSequenceLocks(tx, STANDARD_LOCKTIME_VERIFY_FLAGS, *opt.mempool_view, &lp))
             return state.DoS(0, false, REJECT_NONSTANDARD, "non-BIP68-final");
 
         CAmount nFees = 0;
@@ -913,7 +905,7 @@ static bool AcceptToMemoryPoolWorker(const CTransactionRef &ptx, CTxMempoolAccep
             return state.DoS(0, false, REJECT_NONSTANDARD, "bad-witness-nonstandard", true);
 #else
         // Check for non-standard pay-to-script-hash in inputs
-        if (!AreInputsStandard(tx, view))
+        if (!acceptnonstdtxn && !AreInputsStandard(tx, view))
             return state.Invalid(false, REJECT_NONSTANDARD, "bad-txns-nonstandard-inputs");
 #endif
 
@@ -1155,8 +1147,7 @@ static bool AcceptToMemoryPoolWorker(const CTransactionRef &ptx, CTxMempoolAccep
         // if validation of the package tx was successful remember its mempoolentry
         // if submission is needed this list is used otherwise it is unused
         if(opt.context == ValidationContext::PACKAGE) {
-            if(opt.package_pool)
-                opt.package_pool->AddToPackagePool(ptx);
+            opt.mempool_view->AddToPackagePool(ptx);
             if(opt.submitPool)
                 opt.submitPool->push_back(entry);
         }
