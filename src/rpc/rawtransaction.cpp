@@ -1175,6 +1175,33 @@ static UniValue sendrawtransaction(const JSONRPCRequest& request)
     return hashTx.GetHex();
 }
 
+static void encodePackageResult(bool success, const PackageValidationState& pkg_results, CValidationState state, UniValue& result)
+{
+    UniValue result_0(UniValue::VOBJ);
+    if(success && ArePackageTransactionsAccepted(pkg_results)) {
+        for (const auto& r : pkg_results) {
+            result_0.pushKV("allowed", true);
+            result.pushKV(r.first.GetHex(), result_0);
+        }
+    }
+    else if(state.IsInvalid() || state.IsError()) {
+        result.pushKV("allowed", false);
+        result.pushKV("reject-reason", strprintf("%i: %s", state.GetRejectCode(), state.GetRejectReason()));
+    } else {
+        for (const auto& r : pkg_results) {
+            if(r.second.IsInvalid() || r.second.IsError()) {
+                result_0.pushKV("allowed", false);
+                result_0.pushKV("reject-reason", strprintf("%i: %s", r.second.GetRejectCode(), r.second.GetRejectReason()));
+            } else if (r.second.missingInputs && r.second.IsValid()) {
+                result_0.pushKV("allowed", false);
+                result_0.pushKV("reject-reason", "missing-inputs");
+            } else
+                result_0.pushKV("allowed", true);
+            result.pushKV(r.first.GetHex(), result_0);
+        }
+    }
+}
+
 static UniValue testmempoolaccept(const JSONRPCRequest& request)
 {
     if (request.fHelp || request.params.size() < 1 || request.params.size() > 2) {
@@ -1246,30 +1273,9 @@ static UniValue testmempoolaccept(const JSONRPCRequest& request)
     success = TestPackageAcceptance(package, state, pkg_results);
 
     UniValue result(UniValue::VOBJ);
-    UniValue result_0(UniValue::VOBJ);
 
-    if(success && ArePackageTransactionsAccepted(pkg_results)) {
-        for (const auto& r : pkg_results) {
-            result_0.pushKV("allowed", true);
-            result.pushKV(r.first.GetHex(), result_0);
-        }
-    }
-    else if(state.IsInvalid() || state.IsError()) {
-        result.pushKV("allowed", false);
-        result.pushKV("reject-reason", strprintf("%i: %s", state.GetRejectCode(), state.GetRejectReason()));
-    } else {
-        for (const auto& r : pkg_results) {
-            if(r.second.IsInvalid() || r.second.IsError()) {
-                result_0.pushKV("allowed", false);
-                result_0.pushKV("reject-reason", strprintf("%i: %s", r.second.GetRejectCode(), r.second.GetRejectReason()));
-            } else if (r.second.missingInputs && r.second.IsValid()) {
-                result_0.pushKV("allowed", false);
-                result_0.pushKV("reject-reason", "missing-inputs");
-            } else
-                result_0.pushKV("allowed", true);
-            result.pushKV(r.first.GetHex(), result_0);
-        }
-    }
+    encodePackageResult(success, pkg_results, state, result);
+
     return result;
 }
 
@@ -1329,16 +1335,16 @@ static UniValue submitpackage(const JSONRPCRequest& request)
     PackageValidationState pkg_results;
     std::vector<const CTxMemPoolEntry> submitPool;
 
-    bool success = false;
-    success = TestPackageAcceptance(package, state, pkg_results, &submitPool);
+    bool success = TestPackageAcceptance(package, state, pkg_results, &submitPool);
+
+    UniValue result(UniValue::VOBJ);
 
     if(success && ArePackageTransactionsAccepted(pkg_results))
     {
         success = SubmitPackageToMempool(submitPool, state);
     }
+    encodePackageResult(success, pkg_results, state, result);
 
-    UniValue result(UniValue::VOBJ);
-    result.pushKV("allowed", success);
     return result;
 }
 
@@ -1841,7 +1847,6 @@ static const CRPCCommand commands[] =
     { "rawtransactions",    "combinerawtransaction",        &combinerawtransaction,     {"txs"} },
     { "rawtransactions",    "signrawtransaction",           &signrawtransaction,        {"hexstring","prevtxs","privkeys","sighashtype"} }, /* uses wallet if enabled */
     { "rawtransactions",    "signrawtransactionwithkey",    &signrawtransactionwithkey, {"hexstring","privkeys","prevtxs","sighashtype"} },
-    { "rawtransactions",    "testmempoolaccept",            &testmempoolaccept,         {"rawtxs","allowhighfees"} },
     { "rawtransactions",    "decodepsbt",                   &decodepsbt,                {"psbt"} },
     { "rawtransactions",    "combinepsbt",                  &combinepsbt,               {"txs"} },
     { "rawtransactions",    "finalizepsbt",                 &finalizepsbt,              {"psbt", "extract"} },
@@ -1850,6 +1855,8 @@ static const CRPCCommand commands[] =
 
     { "blockchain",         "gettxoutproof",                &gettxoutproof,             {"txids", "blockhash"} },
     { "blockchain",         "verifytxoutproof",             &verifytxoutproof,          {"proof"} },
+    { "packages",        "testmempoolaccept",           &testmempoolaccept,         {"rawtxs","allowhighfees"} },
+    { "packages",           "submitpackage",                    &submitpackage,             {"rawtxs","allowhighfees"} },
 };
 
 void RegisterRawTransactionRPCCommands(CRPCTable &t)

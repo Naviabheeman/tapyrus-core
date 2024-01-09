@@ -52,11 +52,17 @@ class MempoolAcceptanceTest(BitcoinTestFramework):
             '-reindex',  # Need reindex for txindex
         ]] * self.num_nodes
 
+    def check_submit_mempool_result(self, result_expected, *args, **kwargs):
+        """Wrapper to check result of submitpackage rpc on node_0's mempool"""
+        result_test = self.nodes[0].submitpackage(*args, **kwargs)
+        assert_equal(result_expected, result_test)
+        assert_equal(self.nodes[0].getmempoolinfo()['size'], self.mempool_size + len(kwargs['rawtxs']))
+
     def check_mempool_result(self, result_expected, *args, **kwargs):
-        """Wrapper to check result of testmempoolaccept on node_0's mempool"""
+        """Wrapper to check result of testmempoolaccept rpc on node_0's mempool"""
         result_test = self.nodes[0].testmempoolaccept(*args, **kwargs)
         assert_equal(result_expected, result_test)
-        assert_equal(self.nodes[0].getmempoolinfo()['size'], self.mempool_size)  # Must not change mempool state
+        assert_equal(self.nodes[0].getmempoolinfo()['size'], self.mempool_size)
 
     def create_package(self,  size):
         """create a package with size transactions"""
@@ -421,6 +427,13 @@ class MempoolAcceptanceTest(BitcoinTestFramework):
                                             package[3].hashMalFix: {'allowed': True}},
             rawtxs=raw_package,
         )
+        self.check_submit_mempool_result(
+            result_expected={ package[0].hashMalFix: {'allowed': True},
+                                            package[1].hashMalFix: {'allowed': True},
+                                            package[2].hashMalFix: {'allowed': True},
+                                            package[3].hashMalFix: {'allowed': True}},
+            rawtxs=raw_package,
+        )
 
         # package is accepted
         package = self.create_package(1)
@@ -431,6 +444,10 @@ class MempoolAcceptanceTest(BitcoinTestFramework):
             rawtxs=raw_package,
         )
 
+        self.check_submit_mempool_result(
+            result_expected={ package[0].hashMalFix: {'allowed': True} },
+            rawtxs=raw_package,
+        )
         # test colored coins in package
         node.generate(6, self.signblockprivkey_wif)
 
@@ -458,7 +475,6 @@ class MempoolAcceptanceTest(BitcoinTestFramework):
         spend_tx_1 = node.signrawtransactionwithwallet(spend_tx_1, [{'txid' : i_tx_1.hashMalFix, 'vout' : 2, 'scriptPubKey' : bytes_to_hex_str(i_tx_1.vout[2].scriptPubKey)}, {'txid' : i_tx_1.hashMalFix, 'vout' : 0, 'scriptPubKey' : bytes_to_hex_str(i_tx_1.vout[0].scriptPubKey)} ], "ALL", self.options.scheme)['hex']
         s_tx_1.deserialize(BytesIO(hex_str_to_bytes(spend_tx_1)))
         s_tx_1.rehash()
-        print(s_tx_1)
 
         # Non-Reissuable
         colorid2 = node.getcolor(2, utxos[-1]['txid'], utxos[-1]['vout'])
@@ -512,6 +528,16 @@ class MempoolAcceptanceTest(BitcoinTestFramework):
             txids.append(packagetx.hashMalFix)
 
         self.check_mempool_result(
+            result_expected={ txids[0]: {'allowed': True},
+                                            txids[1]: {'allowed': True},
+                                            txids[2]: {'allowed': True},
+                                            txids[3]: {'allowed': True},
+                                            txids[4]: {'allowed': True},
+                                            txids[5]: {'allowed': True}},
+            rawtxs=package,
+        )
+
+        self.check_submit_mempool_result(
             result_expected={ txids[0]: {'allowed': True},
                                             txids[1]: {'allowed': True},
                                             txids[2]: {'allowed': True},

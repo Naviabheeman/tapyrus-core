@@ -67,7 +67,7 @@ bool  CheckPackage(const Package& txns, CValidationState& state)
 }
 
 
-bool ArePackageTransactionsAccepted(PackageValidationState& results)
+bool ArePackageTransactionsAccepted(const PackageValidationState& results)
 {
     for (const auto& r : results) {
         if(r.second.IsInvalid() || r.second.IsError() || r.second.missingInputs) {

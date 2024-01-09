@@ -789,7 +789,7 @@ bool TestPackageAcceptance(const Package& package,
     return all_valid;
 }
 
-void SubmitToMempool(std::vector<const CTxMemPoolEntry >& validPool, CValidationState& state)
+bool SubmitPackageToMempool(std::vector<const CTxMemPoolEntry >& validPool, CValidationState& state)
 {
     for(auto &entry : validPool) {
         CTransactionRef tx(&entry.GetTx());
@@ -800,13 +800,12 @@ void SubmitToMempool(std::vector<const CTxMemPoolEntry >& validPool, CValidation
             mempool.addUnchecked(tx->GetHashMalFix(), entry, false);
         }
 
-        // trim mempool and check if tx was trimmed
-        LimitMempoolSize(mempool, gArgs.GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000, gArgs.GetArg("-mempoolexpiry", DEFAULT_MEMPOOL_EXPIRY) * 60 * 60);
         if (!mempool.exists(tx->GetHashMalFix()))
-            state.DoS(0, false, REJECT_INSUFFICIENTFEE, "mempool full");
+            return state.DoS(0, false, REJECT_INSUFFICIENTFEE, "mempool full");
 
         GetMainSignals().TransactionAddedToMempool(tx);
     }
+    return true;
 }
 
 static bool AcceptToMemoryPoolWorker(const CTransactionRef &ptx, CTxMempoolAcceptanceOptions& opt)
@@ -905,7 +904,7 @@ static bool AcceptToMemoryPoolWorker(const CTransactionRef &ptx, CTxMempoolAccep
             return state.DoS(0, false, REJECT_NONSTANDARD, "bad-witness-nonstandard", true);
 #else
         // Check for non-standard pay-to-script-hash in inputs
-        if (!acceptnonstdtxn && !AreInputsStandard(tx, view))
+        if (!AreInputsStandard(tx, view))
             return state.Invalid(false, REJECT_NONSTANDARD, "bad-txns-nonstandard-inputs");
 #endif
 

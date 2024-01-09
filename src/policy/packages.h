@@ -41,7 +41,7 @@ bool TestPackageAcceptance(const Package& package,
                                   CValidationState& state,
                                   PackageValidationState& results,
                                   std::vector<const CTxMemPoolEntry >* validPool=nullptr);
-bool ArePackageTransactionsAccepted(PackageValidationState& results);
+bool ArePackageTransactionsAccepted(const PackageValidationState& results);
 
 bool SubmitPackageToMempool(std::vector<const CTxMemPoolEntry >& validPool, CValidationState& state);
 
