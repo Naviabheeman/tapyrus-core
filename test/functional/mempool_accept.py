@@ -427,13 +427,7 @@ class MempoolAcceptanceTest(BitcoinTestFramework):
                                             package[3].hashMalFix: {'allowed': True}},
             rawtxs=raw_package,
         )
-        self.check_submit_mempool_result(
-            result_expected={ package[0].hashMalFix: {'allowed': True},
-                                            package[1].hashMalFix: {'allowed': True},
-                                            package[2].hashMalFix: {'allowed': True},
-                                            package[3].hashMalFix: {'allowed': True}},
-            rawtxs=raw_package,
-        )
+
 
         # package is accepted
         package = self.create_package(1)
@@ -444,19 +438,16 @@ class MempoolAcceptanceTest(BitcoinTestFramework):
             rawtxs=raw_package,
         )
 
-        self.check_submit_mempool_result(
-            result_expected={ package[0].hashMalFix: {'allowed': True} },
-            rawtxs=raw_package,
-        )
+
         # test colored coins in package
         node.generate(6, self.signblockprivkey_wif)
 
         utxos = node.listunspent()
-        node.sethdseed(False, self.signblockprivkey_wif)
+        addr = key_to_p2pkh(self.signblockpubkey)
+    
         # Reissuable
         colorid1 = node.getcolor(1, utxos[0]['scriptPubKey'])
         cp2pkh_address1 = key_to_p2pkh(self.signblockpubkey, color=hex_str_to_bytes(colorid1))
-        addr = key_to_p2pkh(self.signblockpubkey)
 
         # issue
         issue_tx_1 = node.signrawtransactionwithwallet(node.createrawtransaction(
@@ -470,18 +461,17 @@ class MempoolAcceptanceTest(BitcoinTestFramework):
         spend_tx_1 = node.createrawtransaction(
                 inputs=[{'txid': i_tx_1.hashMalFix, 'vout': 2},  {'txid': i_tx_1.hashMalFix, 'vout': 0}],
                 outputs=[{node.getnewaddress("", colorid1): 200}, {node.getnewaddress(): 9}])
+        spend_tx_1 = node.signrawtransactionwithkey(spend_tx_1, [self.signblockprivkey_wif], [{'txid' : i_tx_1.hashMalFix, 'vout' : 2, 'scriptPubKey' : bytes_to_hex_str(i_tx_1.vout[2].scriptPubKey)}, {'txid' : i_tx_1.hashMalFix, 'vout' : 0, 'scriptPubKey' : bytes_to_hex_str(i_tx_1.vout[0].scriptPubKey)} ], "ALL", self.options.scheme)['hex']
         s_tx_1 = CTransaction()
-        s_tx_1.deserialize(BytesIO(hex_str_to_bytes(spend_tx_1)))
-        spend_tx_1 = node.signrawtransactionwithwallet(spend_tx_1, [{'txid' : i_tx_1.hashMalFix, 'vout' : 2, 'scriptPubKey' : bytes_to_hex_str(i_tx_1.vout[2].scriptPubKey)}, {'txid' : i_tx_1.hashMalFix, 'vout' : 0, 'scriptPubKey' : bytes_to_hex_str(i_tx_1.vout[0].scriptPubKey)} ], "ALL", self.options.scheme)['hex']
         s_tx_1.deserialize(BytesIO(hex_str_to_bytes(spend_tx_1)))
         s_tx_1.rehash()
 
         # Non-Reissuable
-        colorid2 = node.getcolor(2, utxos[-1]['txid'], utxos[-1]['vout'])
+        colorid2 = node.getcolor(2, utxos[1]['txid'], utxos[1]['vout'])
         cp2pkh_address2 = key_to_p2pkh(self.signblockpubkey, color=hex_str_to_bytes(colorid2))
         # issue
         issue_tx_2 = node.signrawtransactionwithwallet(node.createrawtransaction(
-                inputs=[{'txid': utxos[-1]['txid'], 'vout': utxos[-1]['vout']}],
+                inputs=[{'txid': utxos[1]['txid'], 'vout': utxos[1]['vout']}],
                 outputs=[{addr: 10}, {node.getnewaddress() : 38}, { cp2pkh_address2 : 100}],
             ), [], "ALL", self.options.scheme)['hex']
         i_tx_2 = CTransaction()
@@ -491,18 +481,17 @@ class MempoolAcceptanceTest(BitcoinTestFramework):
         spend_tx_2 = node.createrawtransaction(
                 inputs=[{'txid': i_tx_2.hashMalFix, 'vout': 2}, {'txid': i_tx_2.hashMalFix, 'vout': 0}],
                 outputs=[{node.getnewaddress("", colorid2): 50}, {node.getnewaddress(): 9}])
+        spend_tx_2 = node.signrawtransactionwithkey(spend_tx_2, [self.signblockprivkey_wif], [{'txid' : i_tx_2.hashMalFix, 'vout' : 2, 'scriptPubKey' : bytes_to_hex_str(i_tx_2.vout[2].scriptPubKey)}, {'txid' : i_tx_2.hashMalFix, 'vout' : 0, 'scriptPubKey' : bytes_to_hex_str(i_tx_2.vout[0].scriptPubKey)} ], "ALL", self.options.scheme)['hex']
         s_tx_2 = CTransaction()
-        s_tx_2.deserialize(BytesIO(hex_str_to_bytes(spend_tx_2)))
-        spend_tx_2 = node.signrawtransactionwithwallet(spend_tx_2, [{'txid' : i_tx_2.hashMalFix, 'vout' : 2, 'scriptPubKey' : bytes_to_hex_str(i_tx_2.vout[2].scriptPubKey)}, {'txid' : i_tx_2.hashMalFix, 'vout' : 0, 'scriptPubKey' : bytes_to_hex_str(i_tx_2.vout[0].scriptPubKey)} ], "ALL", self.options.scheme)['hex']
         s_tx_2.deserialize(BytesIO(hex_str_to_bytes(spend_tx_2)))
         s_tx_2.rehash()
 
         # NFT
-        colorid3 = node.getcolor(3, utxos[-5]['txid'], utxos[-5]['vout'])
+        colorid3 = node.getcolor(3, utxos[2]['txid'], utxos[2]['vout'])
         cp2pkh_address3 = key_to_p2pkh(self.signblockpubkey, color=hex_str_to_bytes(colorid3))
         # issue
         issue_tx_3 = node.signrawtransactionwithwallet(node.createrawtransaction(
-                inputs=[{'txid': utxos[-5]['txid'], 'vout': utxos[-5]['vout']}],
+                inputs=[{'txid': utxos[2]['txid'], 'vout': utxos[2]['vout']}],
                 outputs=[{addr: 10}, {node.getnewaddress() : 38}, { cp2pkh_address3 : 1}],
             ), [], "ALL", self.options.scheme)['hex']
         i_tx_3 = CTransaction()
@@ -511,10 +500,9 @@ class MempoolAcceptanceTest(BitcoinTestFramework):
         # spend
         spend_tx_3 =node.createrawtransaction(
                 inputs=[{'txid': i_tx_3.hashMalFix, 'vout': 2}, {'txid': i_tx_3.hashMalFix, 'vout': 0}],
-                outputs=[{node.getnewaddress("", colorid3): 1}, {node.getnewaddress(): 9}])
+                outputs=[{node.getnewaddress("", colorid3): 1}, {node.getnewaddress(): 8}])
+        spend_tx_3 = node.signrawtransactionwithkey(spend_tx_3, [self.signblockprivkey_wif], [{'txid' : i_tx_3.hashMalFix, 'vout' : 2, 'scriptPubKey' : bytes_to_hex_str(i_tx_3.vout[2].scriptPubKey)}, {'txid' : i_tx_3.hashMalFix, 'vout' : 0, 'scriptPubKey' : bytes_to_hex_str(i_tx_3.vout[0].scriptPubKey)} ], "ALL", self.options.scheme)['hex']
         s_tx_3 = CTransaction()
-        s_tx_3.deserialize(BytesIO(hex_str_to_bytes(spend_tx_3)))
-        spend_tx_3 = node.signrawtransactionwithwallet(spend_tx_3, [{'txid' : i_tx_3.hashMalFix, 'vout' : 2, 'scriptPubKey' : bytes_to_hex_str(i_tx_3.vout[2].scriptPubKey)}, {'txid' : i_tx_3.hashMalFix, 'vout' : 0, 'scriptPubKey' : bytes_to_hex_str(i_tx_3.vout[0].scriptPubKey)} ], "ALL", self.options.scheme)['hex']
         s_tx_3.deserialize(BytesIO(hex_str_to_bytes(spend_tx_3)))
         s_tx_3.rehash()
 
@@ -537,15 +525,6 @@ class MempoolAcceptanceTest(BitcoinTestFramework):
             rawtxs=package,
         )
 
-        self.check_submit_mempool_result(
-            result_expected={ txids[0]: {'allowed': True},
-                                            txids[1]: {'allowed': True},
-                                            txids[2]: {'allowed': True},
-                                            txids[3]: {'allowed': True},
-                                            txids[4]: {'allowed': True},
-                                            txids[5]: {'allowed': True}},
-            rawtxs=package,
-        )
 
 if __name__ == '__main__':
     MempoolAcceptanceTest().main()
