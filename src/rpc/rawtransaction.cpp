@@ -1268,9 +1268,11 @@ static UniValue testmempoolaccept(const JSONRPCRequest& request)
 
     CValidationState state;
     PackageValidationState pkg_results;
+    std::vector<const CTxMemPoolEntry> submitPool;
+    submitPool.reserve(package.size());
 
     bool success = false;
-    success = TestPackageAcceptance(package, state, pkg_results);
+    success = TestPackageAcceptance(package, state, pkg_results, &submitPool);
 
     UniValue result(UniValue::VOBJ);
 
@@ -1334,6 +1336,7 @@ static UniValue submitpackage(const JSONRPCRequest& request)
     CValidationState state;
     PackageValidationState pkg_results;
     std::vector<const CTxMemPoolEntry> submitPool;
+    submitPool.reserve(package.size());
 
     bool success = TestPackageAcceptance(package, state, pkg_results, &submitPool);
 

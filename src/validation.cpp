@@ -1148,7 +1148,7 @@ static bool AcceptToMemoryPoolWorker(const CTransactionRef &ptx, CTxMempoolAccep
         if(opt.context == ValidationContext::PACKAGE) {
             opt.mempool_view->AddToPackagePool(ptx);
             if(opt.submitPool)
-                opt.submitPool->push_back(entry);
+                opt.submitPool->push_back(std::move(entry));
         }
 
         if (opt.flags == MempoolAcceptanceFlags::TEST_ONLY) {
