@@ -696,6 +696,7 @@ bool CheckColorIdentifierValidity(const CTransaction& tx, CValidationState& stat
     return true;
 }
 
+<<<<<<< HEAD
 static bool VerifyTokenBalances(const CTransaction& tx,  CValidationState& state, TxColoredCoinBalancesMap& inColoredCoinBalances, CAmount minrelayFee)
 {
     //for every output eliminate a matching input.
@@ -757,6 +758,8 @@ static unsigned int GetBlockScriptFlags(const CBlockIndex* pindex) {
     return flags;
 }
 
+=======
+>>>>>>> 1ae05fc26a (refactor AcceptToMempool arguments:)
 static bool AcceptToMemoryPoolWorker(const CTransactionRef &ptx, CTxMempoolAcceptanceOptions& opt)
 {
     const CTransaction& tx = *ptx;
@@ -818,8 +821,29 @@ static bool AcceptToMemoryPoolWorker(const CTransactionRef &ptx, CTxMempoolAccep
         view.SetBackend(viewMemPool);
 
         // do all inputs exist?
+<<<<<<< HEAD
         if(!DoAllInputsExist(tx, state, opt, view))
             return false;
+=======
+        for (const CTxIn& txin : tx.vin) {
+            if (!pcoinsTip->HaveCoinInCache(txin.prevout)) {
+                opt.coins_to_uncache.push_back(txin.prevout);
+            }
+            if (!view.HaveCoin(txin.prevout)) {
+                // Are inputs missing because we already have the tx?
+                for (size_t out = 0; out < tx.vout.size(); out++) {
+                    // Optimistically just do efficient check of cache for outputs
+                    if (pcoinsTip->HaveCoinInCache(COutPoint(hash, out))) {
+                        return state.Invalid(false, REJECT_DUPLICATE, "txn-already-known");
+                    }
+                }
+                // Otherwise assume this might be an orphan tx for which we just haven't seen parents yet
+                opt.missingInputs.push_back(txin.prevout);
+
+                return false; // fMissingInputs and !state.IsInvalid() is used to detect this condition, don't set state.Invalid()
+            }
+        }
+>>>>>>> 1ae05fc26a (refactor AcceptToMempool arguments:)
 
         //if there are colored coins in the output verify their colorids
         if(!CheckColorIdentifierValidity(tx, state, view))
@@ -1063,7 +1087,11 @@ static bool AcceptToMemoryPoolWorker(const CTransactionRef &ptx, CTxMempoolAccep
         // This is done last to help prevent CPU exhaustion denial-of-service attacks.
         PrecomputedTransactionData txdata(tx);
         TxColoredCoinBalancesMap inColoredCoinBalances;
+<<<<<<< HEAD
         if (!CheckInputs(tx, state, view, true, STANDARD_SCRIPT_VERIFY_FLAGS, true, false, txdata, inColoredCoinBalances)) {
+=======
+        if (!CheckInputs(tx, state, view, true, scriptVerifyFlags, true, false, txdata, inColoredCoinBalances)) {
+>>>>>>> 1ae05fc26a (refactor AcceptToMempool arguments:)
 
             return false; // state filled in by CheckInputs
         }
@@ -1083,8 +1111,7 @@ static bool AcceptToMemoryPoolWorker(const CTransactionRef &ptx, CTxMempoolAccep
         // There is a similar check in CreateNewBlock() to prevent creating
         // invalid blocks (using TestBlockValidity), however allowing such
         // transactions into the mempool can be exploited as a DoS attack.
-        unsigned int currentBlockScriptVerifyFlags = GetBlockScriptFlags(chainActive.Tip());
-        if (!CheckInputsFromMempoolAndCache(tx, state, view, pool, currentBlockScriptVerifyFlags, true, txdata)) {
+        if (!CheckInputsFromMempoolAndCache(tx, state, view, pool, SCRIPT_VERIFY_NONE, true, txdata)) {
             return error("%s: BUG! PLEASE REPORT THIS! CheckInputs failed against latest-block but not STANDARD flags %s, %s",
                     __func__, hash.ToString(), FormatStateMessage(state));
         }
@@ -1107,6 +1134,7 @@ static bool AcceptToMemoryPoolWorker(const CTransactionRef &ptx, CTxMempoolAccep
                     hash.ToString(),
                     FormatMoney(nModifiedFees - nConflictingFees),
                     (int)nSize - (int)nConflictingSize);
+<<<<<<< HEAD
             TRACE7(mempool, replaced,
                 it->GetTx().GetHashMalFix().begin(),
                 it->GetTxSize(),
@@ -1116,6 +1144,8 @@ static bool AcceptToMemoryPoolWorker(const CTransactionRef &ptx, CTxMempoolAccep
                 tx.GetTotalSize(),
                 nConflictingFees
             );
+=======
+>>>>>>> 1ae05fc26a (refactor AcceptToMempool arguments:)
 
             opt.txnReplaced.push_back(it->GetSharedTx());
         }
@@ -2002,7 +2032,7 @@ bool CChainState::ConnectBlock(const CBlock& block, CValidationState& state, CBl
         // * legacy (always)
         // * p2sh (when P2SH enabled in flags and excludes coinbase)
         // * witness (when witness enabled in flags and excludes coinbase)
-        nSigOpsCost += GetTransactionSigOps(tx, view, flags);
+        nSigOpsCost += GetTransactionSigOps(tx, view, SCRIPT_VERIFY_NONE);
         if (nSigOpsCost > GetMaxBlockSigops())
             return state.DoS(100, error("ConnectBlock(): too many sigops"),
                              REJECT_INVALID, "bad-blk-sigops");
@@ -2012,7 +2042,7 @@ bool CChainState::ConnectBlock(const CBlock& block, CValidationState& state, CBl
         {
             std::vector<CScriptCheck> vChecks;
             bool fCacheResults = fJustCheck; /* Don't cache results if we're actually connecting blocks (still consult the cache, though) */
-            if (!CheckInputs(tx, state, view, fScriptChecks, flags, fCacheResults, fCacheResults, txdata[i], inColoredCoinBalances, nScriptCheckThreads ? &vChecks : nullptr))
+            if (!CheckInputs(tx, state, view, fScriptChecks, SCRIPT_VERIFY_NONE, fCacheResults, fCacheResults, txdata[i], inColoredCoinBalances, nScriptCheckThreads ? &vChecks : nullptr))
                 return error("ConnectBlock(): CheckInputs on %s failed with %s",
                     tx.GetHashMalFix().ToString(), FormatStateMessage(state));
             control.Add(std::move(vChecks));
