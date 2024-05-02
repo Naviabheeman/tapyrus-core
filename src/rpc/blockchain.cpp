@@ -32,6 +32,7 @@
 #include <txmempool.h>
 #include <util.h>
 #include <utilstrencodings.h>
+#include <utxo_snapshot.h>
 #include <hash.h>
 #include <validationinterface.h>
 #include <warnings.h>
@@ -2131,6 +2132,124 @@ static UniValue getcolor(const JSONRPCRequest& request)
     return colorId.toHexString();
 }
 
+UniValue CreateUTXOSnapshot(
+    CAutoFile& afile,
+    const fs::path& path,
+    const fs::path& temppath)
+{
+    std::unique_ptr<CCoinsViewCursor> pcursor;
+    CCoinsStats maybe_stats;
+    const CBlockIndex* tip;
+
+    {
+        // We need to lock cs_main to ensure that the coinsdb isn't written to
+        // between (i) flushing coins cache to disk (coinsdb), (ii) getting stats
+        // based upon the coinsdb, and (iii) constructing a cursor to the
+        // coinsdb for use below this block.
+        //
+        // Cursors returned by leveldb iterate over snapshots, so the contents
+        // of the pcursor will not be affected by simultaneous writes during
+        // use below this block.
+        //
+        // See discussion here:
+        //   https://github.com/bitcoin/bitcoin/pull/15606#discussion_r274479369
+        //
+        LOCK(::cs_main);
+
+        FlushStateToDisk();
+
+        auto success = GetUTXOStats(pcoinsdbview.get(), maybe_stats);
+        if (!success) {
+            throw JSONRPCError(RPC_INTERNAL_ERROR, "Unable to read UTXO set");
+        }
+
+        std::unique_ptr<CCoinsViewCursor> pcursor(pcoinsdbview.get()->Cursor());
+        tip = LookupBlockIndex(maybe_stats.hashBlock);
+    }
+
+    LogPrint(BCLog::RPC, "writing UTXO snapshot at height %d (%s) to file %s (via %s)",
+        tip->nHeight, tip->GetBlockHash().ToString().c_str(),
+        path, temppath);
+
+    SnapshotMetadata metadata{tip->GetBlockHash(), maybe_stats.nTransactionOutputs};
+
+    afile << metadata;
+
+    COutPoint key;
+    Coin coin;
+    unsigned int iter{0};
+
+    while (pcursor->Valid()) {
+        //if (iter % 5000 == 0) ShutdownRequested();
+        //++iter;
+        if (pcursor->GetKey(key) && pcursor->GetValue(coin)) {
+            afile << key;
+            afile << coin;
+        }
+
+        pcursor->Next();
+    }
+
+    afile.fclose();
+
+    UniValue result(UniValue::VOBJ);
+    result.pushKV("coins_written", maybe_stats.nTransactionOutputs);
+    result.pushKV("base_hash", tip->GetBlockHash().ToString());
+    result.pushKV("base_height", tip->nHeight);
+    result.pushKV("path", path.c_str());
+    result.pushKV("txoutset_hash", maybe_stats.hashSerialized.ToString());
+    result.pushKV("nchaintx", tip->nChainTx);
+    return result;
+}
+
+/**
+ * Serialize the UTXO set to a file for loading elsewhere.
+ *
+ * @see SnapshotMetadata
+ */
+static UniValue utxosnapshot(const JSONRPCRequest& request)
+{
+    if (request.fHelp || request.params.size() != 1)
+        throw std::runtime_error(
+        "utxosnapshot \"path\""
+        "Write the serialized UTXO set to disk."
+        "\nArguments:\n"
+            "1. path     -   Path to the output file. If relative, will be prefixed by datadir.\n"
+         "\nResult:\n"
+                "coins_written  - the number of coins written in the snapshot\n"
+                "base_hash  -  the hash of the base of the snapshot\n"
+                "base_height  - the height of the base of the snapshot\n"
+                "path  - the absolute path that the snapshot was written to\n"
+                "txoutset_hash  - the hash of the UTXO set contents\n"
+                "nchaintx  - the number of transactions in the chain up to and including the base block\n");
+
+    std::string path_name = request.params[0].get_str();
+    const fs::path path = GetDataDir()/ path_name;
+    // Write to a temporary path and then move into `path` on completion
+    // to avoid confusion due to an interruption.
+    const fs::path temppath = GetDataDir() / path_name.append(".incomplete");
+
+    if (fs::exists(path)) {
+        throw JSONRPCError(
+            RPC_INVALID_PARAMETER,
+            "path already exists. If you are sure this is what you want, move it out of the way first");
+    }
+
+    FILE* file{fsbridge::fopen(temppath, "wb")};
+    CAutoFile afile{file, SER_DISK, CLIENT_VERSION};
+    if (afile.IsNull()) {
+        throw JSONRPCError(
+            RPC_INVALID_PARAMETER,
+            "Couldn't open file temp file for writing.");
+    }
+
+    UniValue result = CreateUTXOSnapshot(afile, path, temppath);
+    fs::rename(temppath, path);
+
+    result.pushKV("path", path.c_str());
+    return result;
+}
+
 static const CRPCCommand commands[] =
 { //  category              name                      actor (function)         argNames
   //  --------------------- ------------------------  -----------------------  ----------
@@ -2156,7 +2275,8 @@ static const CRPCCommand commands[] =
 
     { "blockchain",         "preciousblock",          &preciousblock,          {"blockhash"} },
     { "blockchain",         "scantxoutset",           &scantxoutset,           {"action", "scanobjects"} },
-    { "blockchain",         "getcolor",               &getcolor,               {"type","txid","index"} },
+    { "blockchain",         "getcolor",                   &getcolor,               {"type","txid","index"} },
+    { "blockchain",         "utxosnapshot",           &utxosnapshot,               {"path"} },
 
     /* Not shown in help */
     { "hidden",             "invalidateblock",        &invalidateblock,        {"blockhash"} },
