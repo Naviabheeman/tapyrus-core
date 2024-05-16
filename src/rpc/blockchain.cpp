@@ -2163,7 +2163,7 @@ UniValue CreateUTXOSnapshot(
             throw JSONRPCError(RPC_INTERNAL_ERROR, "Unable to read UTXO set");
         }
 
-        std::unique_ptr<CCoinsViewCursor> pcursor(pcoinsdbview.get()->Cursor());
+        pcursor = std::unique_ptr<CCoinsViewCursor>(pcoinsdbview.get()->Cursor());
         tip = LookupBlockIndex(maybe_stats.hashBlock);
     }
 
