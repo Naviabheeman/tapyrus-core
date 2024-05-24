@@ -2132,7 +2132,7 @@ static UniValue getcolor(const JSONRPCRequest& request)
     return colorId.toHexString();
 }
 
-UniValue CreateUTXOSnapshot(
+CCoinsStats CreateUTXOSnapshot(
     CAutoFile& afile,
     const fs::path& path,
     const fs::path& temppath)
@@ -2192,14 +2192,7 @@ UniValue CreateUTXOSnapshot(
 
     afile.fclose();
 
-    UniValue result(UniValue::VOBJ);
-    result.pushKV("coins_written", maybe_stats.nTransactionOutputs);
-    result.pushKV("base_hash", tip->GetBlockHash().ToString());
-    result.pushKV("base_height", tip->nHeight);
-    result.pushKV("path", path.c_str());
-    result.pushKV("txoutset_hash", maybe_stats.hashSerialized.ToString());
-    result.pushKV("nchaintx", tip->nChainTx);
-    return result;
+    return maybe_stats;
 }
 
 /**
@@ -2243,10 +2236,17 @@ static UniValue utxosnapshot(const JSONRPCRequest& request)
             "Couldn't open file temp file for writing.");
     }
 
-    UniValue result = CreateUTXOSnapshot(afile, path, temppath);
+    CCoinsStats maybe_stats = CreateUTXOSnapshot(afile, path, temppath);
     fs::rename(temppath, path);
+    const CBlockIndex* tip = LookupBlockIndex(maybe_stats.hashBlock);
 
+    UniValue result(UniValue::VOBJ);
+    result.pushKV("coins_written", maybe_stats.nTransactionOutputs);
+    result.pushKV("base_hash", tip->GetBlockHash().ToString());
+    result.pushKV("base_height", tip->nHeight);
     result.pushKV("path", path.c_str());
+    result.pushKV("txoutset_hash", maybe_stats.hashSerialized.ToString());
+    result.pushKV("nchaintx", tip->nChainTx);
     return result;
 }
 

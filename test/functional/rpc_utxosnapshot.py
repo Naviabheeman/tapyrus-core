@@ -21,7 +21,7 @@ from test_framework.messages import CBlock
 from io import BytesIO
 import os.path
 
-
+FILENAME = "utxosnapshot.dat"
 TIME_GENESIS_BLOCK = 1296688602
 
 class UtxoSnapshotTest(BitcoinTestFramework):
@@ -43,7 +43,6 @@ class UtxoSnapshotTest(BitcoinTestFramework):
         generate_blocks(100, node, hex_str_to_bytes(self.signblockpubkey),  self.signblockprivkey)
         self.sync_all()
 
-        FILENAME = "utxosnapshot.dat"
         out = node.utxosnapshot(FILENAME)
         expected_path = os.path.join(get_datadir_path(self.options.tmpdir, 0), NetworkDirName(), FILENAME)
 
@@ -53,6 +52,7 @@ class UtxoSnapshotTest(BitcoinTestFramework):
         assert_equal(out['base_height'], 100)
         assert_equal(out['path'], str(expected_path))
         assert_equal(out['base_hash'], node.getblockhash(100))
+        assert_equal(out['nchaintx'], 101)
 
         #these hashes should be deterministic
         assert_equal(out['base_hash'], '2e51e8eb5b86c37f0e8e86e88cc311dac30197a746ce707e001703f6a53aa95d')
@@ -61,9 +61,7 @@ class UtxoSnapshotTest(BitcoinTestFramework):
             sha256sum_file(str(expected_path)).hex(),
             'ababe8ac2413d84e15dd1494c5cdf59dd712ee8afd7508e52ad294451e5aa6e9')
 
-        assert_equal(
-            out['txoutset_hash'], '1a3a974c72d75c933dfb6e6d11983813c593ae8387260a2f7fbaa0cb41894ac1')
-        assert_equal(out['nchaintx'], 101)
+        assert_equal(out['txoutset_hash'], '1a3a974c72d75c933dfb6e6d11983813c593ae8387260a2f7fbaa0cb41894ac1')
 
         # Specifying a path to an existing or invalid file will fail.
         assert_raises_rpc_error(

@@ -15,8 +15,7 @@
 
 
 
-//! Metadata describing a serialized version of a UTXO set from which an
-//! assumeutxo Chainstate can be constructed.
+//! Metadata describing a serialized version of a UTXO set from which a  new chainstate can be constructed.
 class SnapshotMetadata
 {
 public:
