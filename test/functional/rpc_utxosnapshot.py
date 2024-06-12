@@ -59,7 +59,7 @@ class UtxoSnapshotTest(BitcoinTestFramework):
 
         assert_equal(
             sha256sum_file(str(expected_path)).hex(),
-            'ababe8ac2413d84e15dd1494c5cdf59dd712ee8afd7508e52ad294451e5aa6e9')
+            'a4884b966b64239b8b24280b445d8310c996467ec1b1d1bd78a9ff767a9ae64a')
 
         assert_equal(out['txoutset_hash'], '1a3a974c72d75c933dfb6e6d11983813c593ae8387260a2f7fbaa0cb41894ac1')
 

@@ -12,4 +12,5 @@ SnapshotMetadata::SnapshotMetadata(const uint256& base_blockhash, uint64_t coins
     base_blockhash(base_blockhash),
     coins_count(coins_count) { 
         ParseUInt64(FederationParams().NetworkIDString(), &networkid);
+        network_mode = gArgs.GetChainMode();
 }

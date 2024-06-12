@@ -26,6 +26,7 @@
 #include <primitives/xfield.h>
 #include <rpc/server.h>
 #include <script/descriptor.h>
+#include <shutdown.h>
 #include <streams.h>
 #include <sync.h>
 #include <txdb.h>
@@ -2178,16 +2179,42 @@ CCoinsStats CreateUTXOSnapshot(
     COutPoint key;
     Coin coin;
     unsigned int iter{0};
+    uint256 last_hash;
+    size_t written_coins_count{0};
+    std::vector<std::pair<uint32_t, Coin>> coins;
 
-    while (pcursor->Valid()) {
-        //if (iter % 5000 == 0) ShutdownRequested();
-        //++iter;
-        if (pcursor->GetKey(key) && pcursor->GetValue(coin)) {
-            afile << key;
+    // To reduce space the serialization format of the snapshot avoids
+    // duplication of tx hashes. The code takes advantage of the guarantee by
+    // leveldb that keys are lexicographically sorted.
+    // In the coins vector we collect all coins that belong to a certain tx hash
+    // (key.hash) and when we have them all (key.hash != last_hash) we write
+    // them to file using the below lambda function.
+    // See also https://github.com/bitcoin/bitcoin/issues/25675
+    auto write_coins_to_file = [&](CAutoFile& afile, const uint256& last_hash, const std::vector<std::pair<uint32_t, Coin>>& coins, size_t& written_coins_count) {
+        afile << last_hash;
+        WriteCompactSize(afile, coins.size());
+        for (const auto& [n, coin] : coins) {
+            WriteCompactSize(afile, n);
             afile << coin;
+            ++written_coins_count;
         }
-
+    };
+    while (pcursor->Valid()) {
+        if (iter % 5000 == 0) ShutdownRequested();
+        ++iter;
+        if (pcursor->GetKey(key) && pcursor->GetValue(coin)) {
+            if (key.hashMalFix != last_hash) {
+                write_coins_to_file(afile, last_hash, coins, written_coins_count);
+                last_hash = key.hashMalFix;
+                coins.clear();
+            }
+            coins.emplace_back(key.n, coin);
+        }
         pcursor->Next();
+    }
+
+    if (!coins.empty()) {
+        write_coins_to_file(afile, last_hash, coins, written_coins_count);
     }
 
     afile.fclose();
