@@ -112,6 +112,7 @@ static UniValue testmempoolaccept(const JSONRPCRequest& request)
     CTxMempoolAcceptanceOptions opt;
     opt.context = ValidationContext::PACKAGE;
     opt.flags = MempoolAcceptanceFlags::TEST_ONLY;
+    opt.flags |= MempoolAcceptanceFlags::BYPASSS_LIMITS;
     opt.submitPool = &submitPool;
     opt.nAbsurdFee = max_raw_tx_fee;
 
@@ -179,6 +180,7 @@ static UniValue submitpackage(const JSONRPCRequest& request)
     CTxMempoolAcceptanceOptions opt;
     opt.context = ValidationContext::PACKAGE;
     opt.flags = MempoolAcceptanceFlags::TEST_ONLY;
+    opt.flags |= MempoolAcceptanceFlags::BYPASSS_LIMITS;
     opt.submitPool = &submitPool;
     opt.nAbsurdFee = max_raw_tx_fee;
 

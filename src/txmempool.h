@@ -834,6 +834,26 @@ enum class MempoolAcceptanceFlags
     TEST_ONLY = 2
 };
 
+inline MempoolAcceptanceFlags operator|=(MempoolAcceptanceFlags a, MempoolAcceptanceFlags b)
+{
+    return static_cast<MempoolAcceptanceFlags>(static_cast<int>(a) | static_cast<int>(b));
+}
+
+inline MempoolAcceptanceFlags operator&=(MempoolAcceptanceFlags a, MempoolAcceptanceFlags b)
+{
+    return static_cast<MempoolAcceptanceFlags>(static_cast<int>(a) & static_cast<int>(b));
+}
+
+inline bool operator|(MempoolAcceptanceFlags a, MempoolAcceptanceFlags b)
+{
+    return ((static_cast<int>(a) | static_cast<int>(b)) > 0);
+}
+
+inline bool operator&(MempoolAcceptanceFlags a, MempoolAcceptanceFlags b)
+{
+    return ((static_cast<int>(a) & static_cast<int>(b)) > 0);
+}
+
 /* All configurable inputs and outputs of accept to mempool are consolidated here for ease of use*/
 struct CTxMempoolAcceptanceOptions {
     ValidationContext context;

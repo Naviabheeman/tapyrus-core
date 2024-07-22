@@ -891,14 +891,14 @@ static bool AcceptToMemoryPoolWorker(const CTransactionRef &ptx, CTxMempoolAccep
         unsigned int nSize = entry.GetTxSize();
 
         CAmount mempoolRejectFee = pool.GetMinFee(gArgs.GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000).GetFee(nSize);
-        if (opt.flags != MempoolAcceptanceFlags::BYPASSS_LIMITS
+        if (!(opt.flags & MempoolAcceptanceFlags::BYPASSS_LIMITS)
           && mempoolRejectFee > 0
           && nModifiedFees < mempoolRejectFee) {
             return state.DoS(0, false, REJECT_INSUFFICIENTFEE, "mempool min fee not met", false, strprintf("%d < %d", nModifiedFees, mempoolRejectFee));
         }
 
         // No transactions are allowed below minRelayTxFee except from disconnected blocks
-        if (opt.flags != MempoolAcceptanceFlags::BYPASSS_LIMITS
+        if (!(opt.flags & MempoolAcceptanceFlags::BYPASSS_LIMITS)
           && nModifiedFees < ::minRelayTxFee.GetFee(nSize)) {
             return state.DoS(0, false, REJECT_INSUFFICIENTFEE, "min relay fee not met", false, strprintf("%d < %d", nModifiedFees, ::minRelayTxFee.GetFee(nSize)));
         }
@@ -1102,7 +1102,7 @@ static bool AcceptToMemoryPoolWorker(const CTransactionRef &ptx, CTxMempoolAccep
                 opt.submitPool->push_back(std::move(entry));
         }
 
-        if (opt.flags == MempoolAcceptanceFlags::TEST_ONLY) {
+        if (opt.flags & MempoolAcceptanceFlags::TEST_ONLY) {
             // Tx was accepted, but not added
             return true;
         }
@@ -1133,13 +1133,13 @@ static bool AcceptToMemoryPoolWorker(const CTransactionRef &ptx, CTxMempoolAccep
         // - it's not being re-added during a reorg which bypasses typical mempool fee limits
         // - the node is not behind
         // - the transaction is not dependent on any other transactions in the mempool
-        bool validForFeeEstimation = !fReplacementTransaction && (opt.flags != MempoolAcceptanceFlags::BYPASSS_LIMITS) && IsCurrentForFeeEstimation() && pool.HasNoInputsOf(tx);
+        bool validForFeeEstimation = !fReplacementTransaction && !(opt.flags & MempoolAcceptanceFlags::BYPASSS_LIMITS) && IsCurrentForFeeEstimation() && pool.HasNoInputsOf(tx);
 
         // Store transaction in memory
         pool.addUnchecked(hash, entry, setAncestors, validForFeeEstimation);
 
         // trim mempool and check if tx was trimmed
-        if (opt.flags != MempoolAcceptanceFlags::BYPASSS_LIMITS) {
+        if (!(opt.flags & MempoolAcceptanceFlags::BYPASSS_LIMITS) ){
             LimitMempoolSize(pool, gArgs.GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000, gArgs.GetArg("-mempoolexpiry", DEFAULT_MEMPOOL_EXPIRY) * 60 * 60);
             if (!pool.exists(hash))
                 return state.DoS(0, false, REJECT_INSUFFICIENTFEE, "mempool full");

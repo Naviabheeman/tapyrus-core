@@ -124,6 +124,15 @@ bool TestPackageAcceptance(const Package& package,
     return all_valid;
 }
 
+// remove package transaction from mempool if it was rejected due to a full mempool
+static bool RemovePackageFromMempool(const std::vector<CTxMemPoolEntry>& validPool)
+{
+    for(auto &entry : validPool) {
+        auto &tx(entry.GetTx());
+        mempool.removeRecursive(tx, MemPoolRemovalReason::SIZELIMIT);
+    }
+}
+
 bool SubmitPackageToMempool(const std::vector<CTxMemPoolEntry>& validPool, CValidationState& state)
 {
     for(auto &entry : validPool) {
@@ -135,11 +144,20 @@ bool SubmitPackageToMempool(const std::vector<CTxMemPoolEntry>& validPool, CVali
             mempool.addUnchecked(tx.GetHashMalFix(), entry, false);
         }
 
-        if (!mempool.exists(tx.GetHashMalFix()))
-            return state.DoS(0, false, REJECT_PACKAGE_MEMPOOL, "mempool full");
-
         //signlaing for gui, wallet etc
         GetMainSignals().TransactionAddedToMempool(entry.GetSharedTx());
     }
+
+    // check if any of the package transaction were evited because of a full mempool
+    // if so remove all package transactions from mempool and return error
+    for(auto &entry : validPool) {
+        auto &tx(entry.GetTx());
+        if (!mempool.exists(tx.GetHashMalFix()))
+        {
+            RemovePackageFromMempool(validPool);
+            return state.DoS(0, false, REJECT_PACKAGE_MEMPOOL, "mempool full");
+        }
+    }
+
     return true;
 }
