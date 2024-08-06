@@ -194,7 +194,7 @@ BOOST_FIXTURE_TEST_CASE(package_validation_tests, PackageTestSetup)
         return submitPool.end();
     };
     CTxMempoolAcceptanceOptions opt;
-    opt.context = ValidationContext::PACKAGE;
+    opt.context = ValidationContext(ValidationEntity::PACKAGE);
     opt.flags = MempoolAcceptanceFlags::TEST_ONLY;
     opt.submitPool = &submitPool;
 
@@ -321,7 +321,7 @@ BOOST_FIXTURE_TEST_CASE(package_orphan_tx_tests, PackageTestSetup)
         return submitPool.end();
     };
     CTxMempoolAcceptanceOptions opt;
-    opt.context = ValidationContext::PACKAGE;
+    opt.context = ValidationContext(ValidationEntity::PACKAGE);
     opt.flags = MempoolAcceptanceFlags::TEST_ONLY;
     opt.submitPool = &submitPool;
 
@@ -575,7 +575,7 @@ BOOST_FIXTURE_TEST_CASE(package_submission_tests, PackageTestSetup)
     std::vector<CTxMemPoolEntry> submitPool;
     submitPool.reserve(package_unrelated.size());
     CTxMempoolAcceptanceOptions opt;
-    opt.context = ValidationContext::PACKAGE;
+    opt.context = ValidationContext(ValidationEntity::PACKAGE);
     opt.flags = MempoolAcceptanceFlags::TEST_ONLY;
     opt.submitPool = &submitPool;
     opt.nAbsurdFee = 1 * COIN;

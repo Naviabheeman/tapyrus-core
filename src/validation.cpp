@@ -437,8 +437,7 @@ bool CheckSequenceLocks(const CTransaction &tx, int flags, CCoinsViewMemPool& vi
     }
     return EvaluateSequenceLocks(index, lockPair);
 }
-
-static void LimitMempoolSize(CTxMemPool& pool, size_t limit, unsigned long age) {
+void LimitMempoolSize(CTxMemPool& pool, size_t limit, unsigned long age) {
     int expired = pool.Expire(GetTime() - age);
     if (expired != 0) {
         LogPrint(BCLog::MEMPOOL, "Expired %i transactions from the memory pool\n", expired);
@@ -537,23 +536,28 @@ static bool CheckInputsFromMempoolAndCache(ValidationContext context, const CTra
     assert(!tx.IsCoinBase());
     for (const CTxIn& txin : tx.vin) {
         const Coin& coin = view.AccessCoin(txin.prevout);
-
+        LogPrintf("CheckInputsFromMempoolAndCache: in %s\n", txin.prevout.ToString().c_str());
         // At this point we haven't actually checked if the coins are all
         // available (or shouldn't assume we have, since CheckInputs does).
         // So we just return failure if the inputs are not available here,
         // and then only have to check equivalence for available inputs.
         if (coin.IsSpent()) return false;
-
+        LogPrintf("CheckInputsFromMempoolAndCache: coin not spent\n");
         const CTransactionRef& txFrom = pool.get(txin.prevout.hashMalFix);
         if (txFrom) {
+            LogPrintf("CheckInputsFromMempoolAndCache: in mempool %s\n", txFrom->GetHashMalFix().ToString().c_str());
             assert(txFrom->GetHashMalFix() == txin.prevout.hashMalFix);
             assert(txFrom->vout.size() > txin.prevout.n);
             assert(txFrom->vout[txin.prevout.n] == coin.out);
-        } else if(context != ValidationContext::PACKAGE) { //transactions in a package are not expected to be present in the disk
+        } else if(context.type != ValidationEntity::PACKAGE) { //transactions in a package are not expected to be present in the disk
+            
                 const Coin& coinFromDisk = pcoinsTip->AccessCoin(txin.prevout);
                 assert(!coinFromDisk.IsSpent());
                 assert(coinFromDisk.out == coin.out);
+                LogPrintf("CheckInputsFromMempoolAndCache: in disk %s %d %b\n", coinFromDisk.out.ToString().c_str(), coinFromDisk.nHeight, coinFromDisk.fCoinBase);
         }
+        else
+            LogPrintf("CheckInputsFromMempoolAndCache: nowhere\n");
     }
 
     TxColoredCoinBalancesMap inColoredCoinBalances;
@@ -764,6 +768,8 @@ static bool AcceptToMemoryPoolWorker(const CTransactionRef &ptx, CTxMempoolAccep
     const uint256 hash = tx.GetHashMalFix();
     AssertLockHeld(cs_main);
 
+    LogPrintf("AcceptToMemoryPool:tx %s %d %s %d\n", hash.ToString().c_str(), static_cast<int>(opt.context.type), opt.context.hash.ToString().c_str(), static_cast<int>(opt.flags));
+
     //ref to variables in opt
     CValidationState& state = opt.state;
     CTxMemPool& pool = mempool;
@@ -802,7 +808,7 @@ static bool AcceptToMemoryPoolWorker(const CTransactionRef &ptx, CTxMempoolAccep
 
     // is it already in the memory pool?
     // if this is a package do not return error, continue
-    if (pool.exists(hash) && opt.context == ValidationContext::PACKAGE) {
+    if (pool.exists(hash) && opt.context.type == ValidationEntity::PACKAGE) {
         return state.Invalid(false, REJECT_DUPLICATE, "txn-already-in-mempool");
     }
 
@@ -887,7 +893,7 @@ static bool AcceptToMemoryPoolWorker(const CTransactionRef &ptx, CTxMempoolAccep
         }
 
         CTxMemPoolEntry entry(ptx, nFees, opt.nAcceptTime, chainActive.Height(),
-                              fSpendsCoinbase, nSigOps, lp);
+                              fSpendsCoinbase, nSigOps, lp, opt.context.hash);
         unsigned int nSize = entry.GetTxSize();
 
         CAmount mempoolRejectFee = pool.GetMinFee(gArgs.GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000).GetFee(nSize);
@@ -949,6 +955,7 @@ static bool AcceptToMemoryPoolWorker(const CTransactionRef &ptx, CTxMempoolAccep
         const bool fReplacementTransaction = setConflicts.size();
         if (fReplacementTransaction)
         {
+            LogPrintf("AcceptToMemoryPool:fReplacementTransaction begin\n");
             CFeeRate newFeeRate(nModifiedFees, nSize);
             std::set<uint256> setConflictsParents;
             const int maxDescendantsToVisit = 100;
@@ -958,6 +965,9 @@ static bool AcceptToMemoryPoolWorker(const CTransactionRef &ptx, CTxMempoolAccep
                 CTxMemPool::txiter mi = pool.mapTx.find(hashConflicting);
                 if (mi == pool.mapTx.end())
                     continue;
+
+
+                LogPrintf("AcceptToMemoryPool:hashConflicting %s\n", hashConflicting.ToString());
 
                 // Save these to avoid repeated lookups
                 setIterConflicting.insert(mi);
@@ -979,6 +989,8 @@ static bool AcceptToMemoryPoolWorker(const CTransactionRef &ptx, CTxMempoolAccep
                 CFeeRate oldFeeRate(mi->GetModifiedFee(), mi->GetTxSize());
                 if (newFeeRate <= oldFeeRate)
                 {
+                    LogPrintf("AcceptToMemoryPool:newFeeRate <= oldFeeRate %d %d\n", newFeeRate.ToString(), oldFeeRate.ToString());
+
                     return state.DoS(0, false,
                             REJECT_INSUFFICIENTFEE, "insufficient fee", false,
                             strprintf("rejecting replacement %s; new feerate %s <= old feerate %s",
@@ -994,6 +1006,7 @@ static bool AcceptToMemoryPoolWorker(const CTransactionRef &ptx, CTxMempoolAccep
 
                 nConflictingCount += mi->GetCountWithDescendants();
             }
+            LogPrintf("AcceptToMemoryPool:nConflictingCount %d\n", nConflictingCount);
             // This potentially overestimates the number of actual descendants
             // but we just want to be conservative to avoid doing too much
             // work.
@@ -1040,6 +1053,7 @@ static bool AcceptToMemoryPoolWorker(const CTransactionRef &ptx, CTxMempoolAccep
             // transactions would not be paid for.
             if (nModifiedFees < nConflictingFees)
             {
+                LogPrintf("AcceptToMemoryPool:nModifiedFees < nConflictingFees %d %d\n", nModifiedFees, nConflictingFees);
                 return state.DoS(0, false,
                                  REJECT_INSUFFICIENTFEE, "insufficient fee", false,
                                  strprintf("rejecting replacement %s, less fees than conflicting txs; %s < %s",
@@ -1051,6 +1065,7 @@ static bool AcceptToMemoryPoolWorker(const CTransactionRef &ptx, CTxMempoolAccep
             CAmount nDeltaFees = nModifiedFees - nConflictingFees;
             if (nDeltaFees < ::incrementalRelayFee.GetFee(nSize))
             {
+                LogPrintf("AcceptToMemoryPool:nDeltaFees < ::incrementalRelayFee.GetFee(nSize) %d %d\n", nDeltaFees, ::incrementalRelayFee.GetFee(nSize));
                 return state.DoS(0, false,
                         REJECT_INSUFFICIENTFEE, "insufficient fee", false,
                         strprintf("rejecting replacement %s, not enough additional fees to relay; %s < %s",
@@ -1058,6 +1073,7 @@ static bool AcceptToMemoryPoolWorker(const CTransactionRef &ptx, CTxMempoolAccep
                               FormatMoney(nDeltaFees),
                               FormatMoney(::incrementalRelayFee.GetFee(nSize))));
             }
+            LogPrintf("AcceptToMemoryPool:fReplacementTransaction end\n");
         }
 
         // Check against previous transactions
@@ -1096,7 +1112,7 @@ static bool AcceptToMemoryPoolWorker(const CTransactionRef &ptx, CTxMempoolAccep
 
         // if validation of the package tx was successful remember its mempoolentry
         // if submission is needed this list is used otherwise it is unused
-        if(opt.context == ValidationContext::PACKAGE) {
+        if(opt.context.type == ValidationEntity::PACKAGE) {
             opt.mempool_view->AddToPackagePool(ptx);
             if(opt.submitPool)
                 opt.submitPool->push_back(std::move(entry));
@@ -1157,6 +1173,7 @@ bool AcceptToMemoryPool(const CTransactionRef &tx, CTxMempoolAcceptanceOptions& 
     opt.nAcceptTime = GetTime();
     bool res = AcceptToMemoryPoolWorker(tx, opt);
     if (!res) {
+        LogPrintf("AcceptToMemoryPool: %s missing:%d\n", opt.state.Describe(), opt.missingInputs.size());
         for (const COutPoint& hashTx : opt.coins_to_uncache)
             pcoinsTip->Uncache(hashTx);
             TRACE2(mempool, rejected,
@@ -1596,6 +1613,7 @@ bool CheckInputs(const CTransaction& tx, CValidationState &state, const CCoinsVi
                 if (pvChecks) {
                     pvChecks->emplace_back(std::move(check));
                 } else if (!check()) {
+                    LogPrintf("CheckInputs: failed %s", tx.GetHashMalFix().ToString().c_str());
                     if (flags & STANDARD_NOT_MANDATORY_VERIFY_FLAGS) {
                         // Check whether the failure was caused by a
                         // non-mandatory script verification check, such as
@@ -1605,7 +1623,10 @@ bool CheckInputs(const CTransaction& tx, CValidationState &state, const CCoinsVi
                         CScriptCheck check2(coin.out, tx, i,
                                 flags & ~STANDARD_NOT_MANDATORY_VERIFY_FLAGS, cacheSigStore, &txdata);
                         if (check2())
+                        {
+                            LogPrintf("CheckInputs:check2 failed %s", tx.GetHashMalFix().ToString().c_str());
                             return state.Invalid(false, REJECT_NONSTANDARD, strprintf("non-mandatory-script-verify-flag (%s)", ScriptErrorString(check.GetScriptError())));
+                        }
                     }
                     // Failures of other flags indicate a transaction that is
                     // invalid in new blocks, e.g. an invalid P2SH. We DoS ban

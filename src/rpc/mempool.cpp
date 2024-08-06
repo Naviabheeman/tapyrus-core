@@ -110,7 +110,8 @@ static UniValue testmempoolaccept(const JSONRPCRequest& request)
 
     bool success = false;
     CTxMempoolAcceptanceOptions opt;
-    opt.context = ValidationContext::PACKAGE;
+    uint256 package_hash = GetPackageHash(package);
+    opt.context = ValidationContext(ValidationEntity::PACKAGE, package_hash);
     opt.flags = MempoolAcceptanceFlags::TEST_ONLY;
     opt.flags |= MempoolAcceptanceFlags::BYPASSS_LIMITS;
     opt.submitPool = &submitPool;
@@ -178,7 +179,8 @@ static UniValue submitpackage(const JSONRPCRequest& request)
     submitPool.reserve(package.size());
 
     CTxMempoolAcceptanceOptions opt;
-    opt.context = ValidationContext::PACKAGE;
+    uint256 package_hash = GetPackageHash(package);
+    opt.context = ValidationContext(ValidationEntity::PACKAGE, package_hash);
     opt.flags = MempoolAcceptanceFlags::TEST_ONLY;
     opt.flags |= MempoolAcceptanceFlags::BYPASSS_LIMITS;
     opt.submitPool = &submitPool;

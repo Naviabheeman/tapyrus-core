@@ -11,6 +11,8 @@
 #include <validationinterface.h>
 #include <uint256.h>
 #include <numeric>
+#include <serialize.h>
+#include <clientversion.h>
 
 
 bool CheckPackage(const Package& txns, CValidationState& state)
@@ -124,15 +126,6 @@ bool TestPackageAcceptance(const Package& package,
     return all_valid;
 }
 
-// remove package transaction from mempool if it was rejected due to a full mempool
-static bool RemovePackageFromMempool(const std::vector<CTxMemPoolEntry>& validPool)
-{
-    for(auto &entry : validPool) {
-        auto &tx(entry.GetTx());
-        mempool.removeRecursive(tx, MemPoolRemovalReason::SIZELIMIT);
-    }
-}
-
 bool SubmitPackageToMempool(const std::vector<CTxMemPoolEntry>& validPool, CValidationState& state)
 {
     for(auto &entry : validPool) {
@@ -148,6 +141,9 @@ bool SubmitPackageToMempool(const std::vector<CTxMemPoolEntry>& validPool, CVali
         GetMainSignals().TransactionAddedToMempool(entry.GetSharedTx());
     }
 
+
+    LimitMempoolSize(mempool, gArgs.GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000, gArgs.GetArg("-mempoolexpiry", DEFAULT_MEMPOOL_EXPIRY) * 60 * 60);
+
     // check if any of the package transaction were evited because of a full mempool
     // if so remove all package transactions from mempool and return error
     for(auto &entry : validPool) {
@@ -161,3 +157,21 @@ bool SubmitPackageToMempool(const std::vector<CTxMemPoolEntry>& validPool, CVali
 
     return true;
 }
+// remove package transaction from mempool if it was rejected due to a full mempool
+void RemovePackageFromMempool(const std::vector<CTxMemPoolEntry>& validPool)
+{
+    for(auto &entry : validPool) {
+        auto &tx(entry.GetTx());
+        mempool.removeRecursive(tx, MemPoolRemovalReason::PACKAGE);
+    }
+}
+uint256 GetPackageHash(const Package& txns)
+{
+    // Get sha256 hash of the txids concatenated in this order
+    CHashWriter hashwriter(SER_DISK, CLIENT_VERSION);
+    for (const auto& tx : txns) {
+        hashwriter << tx->GetHashMalFix();
+    }
+    return hashwriter.GetHash();
+}
+

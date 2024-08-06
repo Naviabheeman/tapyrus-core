@@ -9,6 +9,8 @@
 #include <random.h>
 #include <trace.h>
 
+#include <logging.h>
+
 bool CCoinsView::GetCoin(const COutPoint &outpoint, Coin &coin) const { return false; }
 uint256 CCoinsView::GetBestBlock() const { return uint256(); }
 std::vector<uint256> CCoinsView::GetHeadBlocks() const { return std::vector<uint256>(); }
@@ -48,6 +50,7 @@ CCoinsMap::iterator CCoinsViewCache::FetchCoin(const COutPoint &outpoint) const 
         return cacheCoins.end();
     CCoinsMap::iterator ret = cacheCoins.emplace(std::piecewise_construct, std::forward_as_tuple(outpoint), std::forward_as_tuple(std::move(tmp))).first;
     if (ret->second.coin.IsSpent()) {
+        LogPrintf("FetchCoin: %s, %d, %d\n", ret->second.coin.out.ToString().c_str(), ret->second.coin.nHeight, ret->second.coin.IsSpent());
         // The parent only has an empty entry for this outpoint; we can consider our
         // version as fresh.
         ret->second.flags = CCoinsCacheEntry::FRESH;
@@ -60,6 +63,8 @@ bool CCoinsViewCache::GetCoin(const COutPoint &outpoint, Coin &coin) const {
     CCoinsMap::const_iterator it = FetchCoin(outpoint);
     if (it != cacheCoins.end()) {
         coin = it->second.coin;
+        LogPrintf("GetCoin: %s, %d, %d\n", coin.out.ToString().c_str(), coin.nHeight, coin.IsSpent());
+
         return !coin.IsSpent();
     }
     return false;
@@ -85,6 +90,7 @@ void CCoinsViewCache::AddCoin(const COutPoint &outpoint, Coin&& coin, bool possi
     it->second.flags |= CCoinsCacheEntry::DIRTY | (fresh ? CCoinsCacheEntry::FRESH : 0);
     cachedCoinsUsage += it->second.coin.DynamicMemoryUsage();
 
+    LogPrintf("AddCoin: %s, %d, %d\n", coin.out.ToString().c_str(), coin.nHeight, coin.IsSpent());
     TRACE6(utxocache, utxocache_add,
         outpoint.hashMalFix.GetHex().c_str(),
         (uint32_t)outpoint.n,
@@ -109,6 +115,8 @@ bool CCoinsViewCache::SpendCoin(const COutPoint &outpoint, Coin* moveout) {
     CCoinsMap::iterator it = FetchCoin(outpoint);
     if (it == cacheCoins.end()) return false;
     cachedCoinsUsage -= it->second.coin.DynamicMemoryUsage();
+    LogPrintf("SpendCoin: %s, %d, %d\n", it->second.coin.out.ToString().c_str(), it->second.coin.nHeight, it->second.coin.IsSpent());
+
     TRACE6(utxocache, utxocache_spent,
         outpoint.hashMalFix.GetHex().c_str(),
         (uint32_t)outpoint.n,

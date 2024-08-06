@@ -28,13 +28,25 @@ static_assert(DEFAULT_ANCESTOR_LIMIT >= MAX_PACKAGE_COUNT);
  * same inputs as) one another. */
 using Package = std::vector<CTransactionRef>;
 
+/** A list of all packages in the mempool but not in any block yet.
+ * Tracking this helps in package eviction and accurate fee estimation.
+ * Also when one or more transactions from a package have been added to a block,
+ * then the rest of the package should never be evicted.
+ * */
+using PackageInMempool = std::vector<CTxMemPoolEntry*>;
+
+/** Package validation results are actually the result of
+ * validationg each transaction in the package 
+ * Its stored in a map with transaction id.
+ * */
 using PackageValidationState = std::map<const uint256, const CValidationState >;
+
 /** Context-free package policy checks:
  * 1. The number of transactions cannot exceed MAX_PACKAGE_COUNT.
  * 2. The total size cannot exceed  MAX_PACKAGE_COUNT * 1000
  * 3. If any dependencies exist between transactions, parents must appear before children.
  * 4. Transactions cannot conflict, i.e., spend the same inputs.
- */
+ * */
 bool CheckPackage(const Package& txns, CValidationState& state);
 
 void FilterMempoolDuplicates(const std::vector<CTransaction>& txns, Package& package, PackageValidationState& results);
@@ -46,5 +58,9 @@ bool TestPackageAcceptance(const Package& package,
 bool ArePackageTransactionsAccepted(const PackageValidationState& results);
 
 bool SubmitPackageToMempool(const std::vector<CTxMemPoolEntry >& validPool, CValidationState& state);
+
+void RemovePackageFromMempool(const std::vector<CTxMemPoolEntry>& validPool);
+
+uint256 GetPackageHash(const Package& txns);
 
 #endif // TAPYRUS_POLICY_PACKAGES_H

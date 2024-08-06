@@ -444,7 +444,7 @@ CMutableTransaction ConstructTransaction(const UniValue& inputs_in, const UniVal
     if (!rbf.isNull() && rawTx.vin.size() > 0 && rbfOptIn != SignalsOptInRBF(rawTx)) {
         throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid parameter combination: Sequence number(s) contradict replaceable option");
     }
-
+    LogPrintf("ConstructTransaction : %s\n", CTransaction(rawTx).ToString());
     return rawTx;
 }
 
@@ -753,7 +753,9 @@ UniValue SignTransaction(CMutableTransaction& mtx, const UniValue& prevTxsUnival
         view.SetBackend(viewMempool); // temporarily switch cache backend to db+mempool view
 
         for (const CTxIn& txin : mtx.vin) {
-            view.AccessCoin(txin.prevout); // Load entries from viewChain into view; can fail.
+            const Coin& coin = view.AccessCoin(txin.prevout); // Load entries from viewChain into view; can fail.
+            LogPrintf("SignTransaction 1: %s, %d, %d\n", coin.out.ToString().c_str(), coin.nHeight, coin.IsSpent());
+
         }
 
         view.SetBackend(viewDummy); // switch back to avoid locking mempool for too long
@@ -790,6 +792,8 @@ UniValue SignTransaction(CMutableTransaction& mtx, const UniValue& prevTxsUnival
 
             {
                 const Coin& coin = view.AccessCoin(out);
+                LogPrintf("SignTransaction 2: %s, %d, %d\n", out.ToString().c_str(), coin.nHeight, coin.IsSpent());
+
                 if (!coin.IsSpent() && coin.out.scriptPubKey != scriptPubKey) {
                     std::string err("Previous output scriptPubKey mismatch:\n");
                     err = err + ScriptToAsmStr(coin.out.scriptPubKey) + "\nvs:\n"+
@@ -839,6 +843,7 @@ UniValue SignTransaction(CMutableTransaction& mtx, const UniValue& prevTxsUnival
         CTxIn& txin = mtx.vin[i];
         const Coin& coin = view.AccessCoin(txin.prevout);
         if (coin.IsSpent()) {
+            LogPrintf("SignTransaction 3: %s, %d, %d\n", coin.out.ToString().c_str(), coin.nHeight, coin.IsSpent());
             TxInErrorToJSON(txin, vErrors, "Input not found or already spent");
             continue;
         }

@@ -466,4 +466,5 @@ inline bool IsBlockPruned(const CBlockIndex* pblockindex)
 
 bool isBlockHeightInCoinbase(const CBlock& block);
 
+void LimitMempoolSize(CTxMemPool& pool, size_t limit, unsigned long age);
 #endif // BITCOIN_VALIDATION_H

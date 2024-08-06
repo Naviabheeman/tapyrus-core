@@ -22,9 +22,11 @@
 
 CTxMemPoolEntry::CTxMemPoolEntry(const CTransactionRef& _tx, const CAmount& _nFee,
                                  int64_t _nTime, unsigned int _entryHeight,
-                                 bool _spendsCoinbase, int32_t _sigOpsCost, LockPoints lp):
+                                 bool _spendsCoinbase, int32_t _sigOpsCost, LockPoints lp,
+                                 uint256 _packageHash):
     tx(_tx), nFee(_nFee), nTime(_nTime), entryHeight(_entryHeight),
-    spendsCoinbase(_spendsCoinbase), sigOpCost(_sigOpsCost), lockPoints(lp)
+    spendsCoinbase(_spendsCoinbase), sigOpCost(_sigOpsCost), lockPoints(lp),
+    packageHash(_packageHash)
 {
     nTxSize = GetSerializeSize(tx, SER_NETWORK, PROTOCOL_VERSION);
     nUsageSize = RecursiveDynamicUsage(tx);
@@ -478,6 +480,16 @@ void CTxMemPool::CalculateDescendants(txiter entryit, setEntries& setDescendants
                 stage.insert(childiter);
             }
         }
+            //if the transaction being evicted is part of a package then add all package transactions to its decendants
+        if(!it->packageHash.IsNull()) {
+            LogPrint(BCLog::MEMPOOL, "CalculateDescendants: Check package %s \n", it->packageHash.ToString().c_str());
+
+            indexed_transaction_set::index<package_hash>::type::iterator pkgit = mapTx.get<package_hash>().begin();
+            while (pkgit != mapTx.get<package_hash>().end() && pkgit->packageHash == it->packageHash) {
+                stage.insert(mapTx.project<0>(pkgit));
+                pkgit++;
+            }
+        }
     }
 }
 
@@ -507,6 +519,12 @@ void CTxMemPool::removeRecursive(const CTransaction &origTx, MemPoolRemovalReaso
         setEntries setAllRemoves;
         for (txiter it : txToRemove) {
             CalculateDescendants(it, setAllRemoves);
+            if(!it->packageHash.IsNull())
+            {
+                LogPrint(BCLog::MEMPOOL, "Remove package %s from mempool \n", it->packageHash.ToString().c_str());
+
+                RemovePackage(it->packageHash);
+            }
         }
 
         RemoveStaged(setAllRemoves, false, reason);
@@ -960,6 +978,22 @@ int CTxMemPool::Expire(int64_t time) {
     return stage.size();
 }
 
+int CTxMemPool::RemovePackage(const uint256 packageHash) {
+    LOCK(cs);
+    indexed_transaction_set::index<package_hash>::type::iterator it = mapTx.get<package_hash>().begin();
+    setEntries toremove;
+    while (it != mapTx.get<package_hash>().end() && it->packageHash == packageHash) {
+        toremove.insert(mapTx.project<0>(it));
+        it++;
+    }
+    setEntries stage;
+    for (txiter removeit : toremove) {
+        CalculateDescendants(removeit, stage);
+    }
+    RemoveStaged(stage, false, MemPoolRemovalReason::PACKAGE);
+    return stage.size();
+}
+
 void CTxMemPool::addUnchecked(const uint256&hash, const CTxMemPoolEntry &entry, bool validFeeEstimate)
 {
     setEntries setAncestors;
@@ -1078,6 +1112,7 @@ void CTxMemPool::TrimToSize(size_t sizelimit, std::vector<COutPoint>* pvNoSpends
     if (maxFeeRateRemoved > CFeeRate(0)) {
         LogPrint(BCLog::MEMPOOL, "Removed %u txn, rolling minimum fee bumped to %s\n", nTxnRemoved, maxFeeRateRemoved.ToString());
     }
+
 }
 
 uint64_t CTxMemPool::CalculateDescendantMaximum(txiter entry) const {
@@ -1123,7 +1158,8 @@ std::string RemovalReasonToString(const MemPoolRemovalReason& r) noexcept
         case MemPoolRemovalReason::BLOCK: return "block";
         case MemPoolRemovalReason::CONFLICT: return "conflict";
         case MemPoolRemovalReason::REPLACED: return "replaced";
+        case MemPoolRemovalReason::PACKAGE: return "package";
         case MemPoolRemovalReason::UNKNOWN: return "unknown";
     }
 }
-CTxMempoolAcceptanceOptions:: CTxMempoolAcceptanceOptions():context(ValidationContext::TRANSACTION), flags(MempoolAcceptanceFlags::NONE), nAbsurdFee(0), nAcceptTime(0), mempool_view(new CCoinsViewMemPool(pcoinsTip.get(), mempool)){}
+CTxMempoolAcceptanceOptions:: CTxMempoolAcceptanceOptions():context(ValidationEntity::TRANSACTION), flags(MempoolAcceptanceFlags::NONE), nAbsurdFee(0), nAcceptTime(0), mempool_view(new CCoinsViewMemPool(pcoinsTip.get(), mempool)){}

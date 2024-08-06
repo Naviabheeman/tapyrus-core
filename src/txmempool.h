@@ -94,7 +94,7 @@ public:
     CTxMemPoolEntry(const CTransactionRef& _tx, const CAmount& _nFee,
                     int64_t _nTime, unsigned int _entryHeight,
                     bool spendsCoinbase,
-                    int32_t nSigOpsCost, LockPoints lp);
+                    int32_t nSigOpsCost, LockPoints lp, uint256 packageHash = uint256());
 
     const CTransaction& GetTx() const { return *this->tx; }
     CTransactionRef GetSharedTx() const { return this->tx; }
@@ -129,6 +129,8 @@ public:
     int32_t GetSigOpCostWithAncestors() const { return nSigOpCostWithAncestors; }
 
     mutable size_t vTxHashesIdx; //!< Index in mempool's vTxHashes
+    // If the transaction is part of a package, this hash is non zero.
+    uint256 packageHash;
 };
 
 // Helpers for modifying CTxMemPool::mapTx, which is a boost multi_index.
@@ -314,10 +316,24 @@ public:
     }
 };
 
+/* To check whether two mempool entries are part of the same package.
+ * Useful in package eviction
+ */
+class CompareTxMemPoolEntryByPackageHash{
+public:
+    bool operator()(const CTxMemPoolEntry& a, const CTxMemPoolEntry& b) const
+    {
+        return a.packageHash < b.packageHash;
+    }
+};
+
+
+
 // Multi_index tag names
 struct descendant_score {};
 struct entry_time {};
 struct ancestor_score {};
+struct package_hash {};
 
 class CBlockPolicyEstimator;
 
@@ -349,7 +365,8 @@ enum class MemPoolRemovalReason {
     REORG,       //! Removed for reorganization
     BLOCK,       //! Removed for block
     CONFLICT,    //! Removed for conflict with in-block transaction
-    REPLACED     //! Removed for replacement
+    REPLACED,     //! Removed for replacement
+    PACKAGE       //! Removed when its package was evicted
 };
 
 std::string RemovalReasonToString(const MemPoolRemovalReason& r) noexcept;
@@ -482,6 +499,12 @@ public:
                 boost::multi_index::tag<ancestor_score>,
                 boost::multi_index::identity<CTxMemPoolEntry>,
                 CompareTxMemPoolEntryByAncestorFee
+            >,
+            // sorted by package hash
+            boost::multi_index::ordered_non_unique<
+                boost::multi_index::tag<package_hash>,
+                boost::multi_index::identity<CTxMemPoolEntry>,
+                CompareTxMemPoolEntryByPackageHash
             >
         >
     > indexed_transaction_set;
@@ -622,6 +645,7 @@ public:
     /** Expire all transaction (and their dependencies) in the mempool older than time. Return the number of removed transactions. */
     int Expire(int64_t time);
 
+    int RemovePackage(const uint256 packageHash);
     /**
      * Calculate the ancestor and descendant count for the given transaction.
      * The counts include the transaction itself.
@@ -816,11 +840,17 @@ struct DisconnectedBlockTransactions {
 
 
 /* is the tx validation stand alone or part of a bigger entity */
-enum class ValidationContext {
+enum class ValidationEntity {
     TRANSACTION,
     BLOCK,
     INDEX,
     PACKAGE
+};
+
+struct ValidationContext {
+    ValidationEntity type;
+    uint256 hash;
+    ValidationContext(const ValidationEntity _type, const uint256 _hash = uint256()):type(_type), hash(_hash){}
 };
 
 /* Options to change the behaviour of Accept to mempool
