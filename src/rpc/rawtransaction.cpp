@@ -1135,7 +1135,7 @@ static UniValue sendrawtransaction(const JSONRPCRequest& request)
     bool fHaveMempool = mempool.exists(hashTx);
     if (!fHaveMempool && !fHaveChain) {
         // push to local node and sync with wallets
-        CTxMempoolAcceptanceOptions opt;
+        CTxMempoolAcceptanceOptions opt(tx);
         opt.nAbsurdFee = nMaxRawTxFee;
         if (!AcceptToMemoryPool(std::move(tx), opt)) {
             if (opt.state.IsInvalid()) {

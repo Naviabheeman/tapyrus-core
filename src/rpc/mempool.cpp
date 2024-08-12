@@ -10,6 +10,9 @@
 #include <rpc/client.h>
 #include <txmempool.h>
 #include <utilstrencodings.h>
+#include <mempooloptions.h>
+#include <validation.h>
+#include <validationinterface.h>
 
 #include <stdint.h>
 
@@ -43,6 +46,83 @@ static void encodePackageResult(bool success, const PackageValidationState& pkg_
         }
     }
 }
+
+bool TestPackageAcceptance(const Package& package,
+                                  CValidationState& state,
+                                  PackageValidationState& results,
+                                  CTxMempoolAcceptanceOptions& opt)
+{
+
+
+    bool all_valid = true;
+    bool test_accept_res = false;
+
+    // testmempool acceptance first
+    for(auto &tx : package) {
+        {
+            opt.state = CValidationState();
+            LOCK(::cs_main);
+            test_accept_res = AcceptToMemoryPool(tx, opt);
+        }
+
+        opt.state.missingInputs = opt.missingInputs.size() > 0;
+        results.emplace(tx->GetHashMalFix(), opt.state);
+        all_valid &= test_accept_res;
+    }
+
+    return all_valid;
+}
+
+bool SubmitPackageToMempool(const PackageInMempool& validPool, CValidationState& state)
+{
+    for(auto &entry : validPool) {
+        auto &tx(entry.GetTx());
+        {
+            // Store transaction in mempool if validation succeeded
+            LOCK(::cs_main);
+            LOCK(mempool.cs);
+            mempool.addUnchecked(tx.GetHashMalFix(), entry, false);
+        }
+
+        //signlaing for gui, wallet etc
+        GetMainSignals().TransactionAddedToMempool(entry.GetSharedTx());
+    }
+
+
+    LimitMempoolSize(mempool, gArgs.GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000, gArgs.GetArg("-mempoolexpiry", DEFAULT_MEMPOOL_EXPIRY) * 60 * 60);
+
+    // check if any of the package transaction were evited because of a full mempool
+    // if so remove all package transactions from mempool and return error
+    for(auto &entry : validPool) {
+        auto &tx(entry.GetTx());
+        if (!mempool.exists(tx.GetHashMalFix()))
+        {
+            RemovePackageFromMempool(validPool);
+            return state.DoS(0, false, REJECT_PACKAGE_MEMPOOL, "mempool full");
+        }
+    }
+
+    return true;
+}
+// remove package transaction from mempool if it was rejected due to a full mempool
+void RemovePackageFromMempool(const PackageInMempool& validPool)
+{
+    for(auto &entry : validPool) {
+        auto &tx(entry.GetTx());
+        mempool.removeRecursive(tx, MemPoolRemovalReason::PACKAGE);
+    }
+}
+
+bool ArePackageTransactionsAccepted(const PackageValidationState& results)
+{
+    for (const auto& r : results) {
+        if(r.second.IsInvalid() || r.second.IsError() || r.second.missingInputs) {
+            return false;
+        }
+    }
+    return true;
+}
+
 
 static UniValue testmempoolaccept(const JSONRPCRequest& request)
 {
@@ -102,27 +182,27 @@ static UniValue testmempoolaccept(const JSONRPCRequest& request)
     Package package;
     CValidationState state;
     PackageValidationState pkg_results;
+    CCachedPackage chachedPackage;
 
-    FilterMempoolDuplicates(transactions, package, pkg_results);
+    if(!CheckPackage(package, state, pkg_results, chachedPackage))
+    {
+        throw JSONRPCError(RPC_INVALID_PARAMETER,
+                    "package acceptance failed: " + state.Describe());
+    }
 
     std::vector<CTxMemPoolEntry> submitPool;
     submitPool.reserve(package.size());
 
-    bool success = false;
-    CTxMempoolAcceptanceOptions opt;
-    uint256 package_hash = GetPackageHash(package);
-    opt.context = ValidationContext(ValidationEntity::PACKAGE, package_hash);
+    CTxMempoolAcceptanceOptions opt(chachedPackage);
     opt.flags = MempoolAcceptanceFlags::TEST_ONLY;
     opt.flags |= MempoolAcceptanceFlags::BYPASSS_LIMITS;
     opt.submitPool = &submitPool;
     opt.nAbsurdFee = max_raw_tx_fee;
 
-    success = TestPackageAcceptance(package, state, pkg_results, opt);
+    bool success = TestPackageAcceptance(package, state, pkg_results, opt);
 
     UniValue result(UniValue::VOBJ);
-
     encodePackageResult(success, pkg_results, state, result);
-
     return result;
 }
 
@@ -172,15 +252,18 @@ static UniValue submitpackage(const JSONRPCRequest& request)
     Package package;
     CValidationState state;
     PackageValidationState pkg_results;
+    CCachedPackage chachedPackage;
 
-    FilterMempoolDuplicates(transactions, package, pkg_results);
+    if(!CheckPackage(package, state, pkg_results, chachedPackage))
+    {
+        throw JSONRPCError(RPC_INVALID_PARAMETER,
+                    "package acceptance failed: " + state.Describe());
+    }
 
     std::vector<CTxMemPoolEntry> submitPool;
     submitPool.reserve(package.size());
 
-    CTxMempoolAcceptanceOptions opt;
-    uint256 package_hash = GetPackageHash(package);
-    opt.context = ValidationContext(ValidationEntity::PACKAGE, package_hash);
+    CTxMempoolAcceptanceOptions opt(chachedPackage);
     opt.flags = MempoolAcceptanceFlags::TEST_ONLY;
     opt.flags |= MempoolAcceptanceFlags::BYPASSS_LIMITS;
     opt.submitPool = &submitPool;
@@ -188,14 +271,13 @@ static UniValue submitpackage(const JSONRPCRequest& request)
 
     bool success = TestPackageAcceptance(package, state, pkg_results, opt);
 
-    UniValue result(UniValue::VOBJ);
-
     if(success && ArePackageTransactionsAccepted(pkg_results))
     {
         success = SubmitPackageToMempool(submitPool, state);
     }
-    encodePackageResult(success, pkg_results, state, result);
 
+    UniValue result(UniValue::VOBJ);
+    encodePackageResult(success, pkg_results, state, result);
     return result;
 }
 

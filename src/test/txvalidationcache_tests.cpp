@@ -29,7 +29,7 @@ ToMemPool(const CMutableTransaction& tx)
 {
     LOCK(cs_main);
 
-    CTxMempoolAcceptanceOptions opt;
+    CTxMempoolAcceptanceOptions opt(MakeTransactionRef(tx));
     opt.flags = MempoolAcceptanceFlags::BYPASSS_LIMITS;
     return AcceptToMemoryPool(MakeTransactionRef(tx), opt);
 }

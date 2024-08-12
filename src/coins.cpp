@@ -63,7 +63,7 @@ bool CCoinsViewCache::GetCoin(const COutPoint &outpoint, Coin &coin) const {
     CCoinsMap::const_iterator it = FetchCoin(outpoint);
     if (it != cacheCoins.end()) {
         coin = it->second.coin;
-        LogPrintf("GetCoin: %s, %d, %d\n", coin.out.ToString().c_str(), coin.nHeight, coin.IsSpent());
+        LogPrintf("CCoinsViewCache::GetCoin: %s, %d, %d\n", coin.out.ToString().c_str(), coin.nHeight, coin.IsSpent());
 
         return !coin.IsSpent();
     }

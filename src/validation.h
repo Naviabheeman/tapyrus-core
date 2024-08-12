@@ -21,7 +21,7 @@
 #include <chainparams.h>
 #include <chain.h>
 #include <xfieldhistory.h>
-#include <txmempool.h>
+#include <mempooloptions.h>
 
 #include <algorithm>
 #include <exception>
@@ -50,6 +50,7 @@ struct XFieldChange;
 
 struct PrecomputedTransactionData;
 struct LockPoints;
+struct CCachedPackage;
 
 /** Default for -whitelistrelay. */
 static const bool DEFAULT_WHITELISTRELAY = true;
@@ -338,7 +339,7 @@ bool TestLockPointValidity(const LockPoints* lp);
  *
  * See consensus/consensus.h for flag definitions.
  */
-bool CheckSequenceLocks(const CTransaction &tx, int flags,  CCoinsViewMemPool& viewMemPool, LockPoints* lp = nullptr, bool useExistingLockPoints = false);
+bool CheckSequenceLocks(const CTransaction &tx, int flags, CCoinsViewMemPool& viewMemPool, LockPoints* lp = nullptr, bool useExistingLockPoints = false);
 
 /**
  * Closure representing one script verification

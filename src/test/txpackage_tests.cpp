@@ -18,6 +18,8 @@
 #include <utilstrencodings.h>
 #include <util.h>
 #include <validation.h>
+#include <rpc/mempool.h>
+#include <mempooloptions.h>
 #include <boost/test/unit_test.hpp>
 
 struct PackageTestSetup: public TestChainSetup
@@ -131,6 +133,8 @@ bool IsChildWithParentsTree(const Package& package)
 
 BOOST_FIXTURE_TEST_CASE(package_sanitization_tests, PackageTestSetup)
 {
+    CCachedPackage cachedpkg;
+    PackageValidationState results;
     // Packages can't have more than 25 transactions.
     Package package_too_many;
     package_too_many.reserve(MAX_PACKAGE_COUNT + 1);
@@ -138,7 +142,7 @@ BOOST_FIXTURE_TEST_CASE(package_sanitization_tests, PackageTestSetup)
         package_too_many.emplace_back(MakeTransactionRef(create_placeholder_tx(1, 1)));
     }
     CValidationState state_too_many;
-    BOOST_CHECK(!CheckPackage(package_too_many, state_too_many));
+    BOOST_CHECK(!CheckPackage(package_too_many, state_too_many, results, cachedpkg));
     BOOST_CHECK_EQUAL(state_too_many.GetRejectCode(), REJECT_PACKAGE_INVALID);
     BOOST_CHECK_EQUAL(state_too_many.GetRejectReason(), "package-too-many-transactions");
 
@@ -149,7 +153,7 @@ BOOST_FIXTURE_TEST_CASE(package_sanitization_tests, PackageTestSetup)
         package_duplicate_txids_empty.emplace_back(MakeTransactionRef(empty_tx));
     }
     CValidationState state_duplicates;
-    BOOST_CHECK(!CheckPackage(package_duplicate_txids_empty, state_duplicates));
+    BOOST_CHECK(!CheckPackage(package_duplicate_txids_empty, state_duplicates, results, cachedpkg));
     BOOST_CHECK_EQUAL(state_duplicates.GetRejectCode(), REJECT_PACKAGE_INVALID);
     BOOST_CHECK_EQUAL(state_duplicates.GetRejectReason(), "package-contains-duplicates");
 
@@ -165,7 +169,7 @@ BOOST_FIXTURE_TEST_CASE(package_sanitization_tests, PackageTestSetup)
     Package package_conflicts{MakeTransactionRef(tx_zero_1), MakeTransactionRef(tx_zero_2)};
 
     CValidationState state_conflicts;
-    BOOST_CHECK(!CheckPackage(package_conflicts, state_conflicts));
+    BOOST_CHECK(!CheckPackage(package_conflicts, state_conflicts, results, cachedpkg));
     BOOST_CHECK_EQUAL(state_conflicts.GetRejectCode(), REJECT_PACKAGE_INVALID);
     BOOST_CHECK_EQUAL(state_conflicts.GetRejectReason(), "conflict-in-package");
 
@@ -177,9 +181,9 @@ BOOST_FIXTURE_TEST_CASE(package_sanitization_tests, PackageTestSetup)
     dup_tx.vin.emplace_back(rand_prevout);
     Package package_with_dup_tx{MakeTransactionRef(dup_tx)};
     CValidationState state;
-    BOOST_CHECK(CheckPackage(package_with_dup_tx, state));
+    BOOST_CHECK(CheckPackage(package_with_dup_tx, state, results, cachedpkg));
     package_with_dup_tx.emplace_back(MakeTransactionRef(create_placeholder_tx(1, 1)));
-    BOOST_CHECK(CheckPackage(package_with_dup_tx, state));
+    BOOST_CHECK(CheckPackage(package_with_dup_tx, state, results, cachedpkg));
 }
 
 BOOST_FIXTURE_TEST_CASE(package_validation_tests, PackageTestSetup)
@@ -193,10 +197,6 @@ BOOST_FIXTURE_TEST_CASE(package_validation_tests, PackageTestSetup)
                 return iter;
         return submitPool.end();
     };
-    CTxMempoolAcceptanceOptions opt;
-    opt.context = ValidationContext(ValidationEntity::PACKAGE);
-    opt.flags = MempoolAcceptanceFlags::TEST_ONLY;
-    opt.submitPool = &submitPool;
 
     CKey parent_key;
     parent_key.MakeNewKey(true);
@@ -220,7 +220,12 @@ BOOST_FIXTURE_TEST_CASE(package_validation_tests, PackageTestSetup)
         CMutableTransaction mtx_child = CreateValidMempoolTransaction(mempool, spend_parent, CAmount(48 * COIN), child_locking_script);
 
         Package package_parent_child{MakeTransactionRef(mtx_parent), MakeTransactionRef(mtx_child)};
+        CCachedPackage cachedpkg;
+        CheckPackage(package_parent_child, state, validationState, cachedpkg);
 
+        CTxMempoolAcceptanceOptions opt(cachedpkg);
+        opt.flags = MempoolAcceptanceFlags::TEST_ONLY;
+        opt.submitPool = &submitPool;
         auto result_parent_child = TestPackageAcceptance(package_parent_child, state, validationState, opt);
         
         BOOST_CHECK(!result_parent_child);
@@ -254,8 +259,12 @@ BOOST_FIXTURE_TEST_CASE(package_validation_tests, PackageTestSetup)
         mtx_child.vin[0].scriptSig = CScript() << OP_TRUE;
 
         Package package_parent_child{MakeTransactionRef(mtx_parent), MakeTransactionRef(mtx_child)};
+        CCachedPackage cachedpkg;
+        CheckPackage(package_parent_child, state, validationState, cachedpkg);
         submitPool.clear();
-
+        CTxMempoolAcceptanceOptions opt(cachedpkg);
+        opt.flags = MempoolAcceptanceFlags::TEST_ONLY;
+        opt.submitPool = &submitPool;
         auto result_parent_child = TestPackageAcceptance(package_parent_child, state, validationState, opt);
 
         BOOST_CHECK(result_parent_child);
@@ -289,8 +298,12 @@ BOOST_FIXTURE_TEST_CASE(package_validation_tests, PackageTestSetup)
         mtx_child.vin[0].scriptSig = CScript() << OP_TRUE;
 
         Package package_parent_child{MakeTransactionRef(mtx_parent), MakeTransactionRef(mtx_child)};
+        CCachedPackage cachedpkg;
+        CheckPackage(package_parent_child, state, validationState, cachedpkg);
         submitPool.clear();
-
+        CTxMempoolAcceptanceOptions opt(cachedpkg);
+        opt.flags = MempoolAcceptanceFlags::TEST_ONLY;
+        opt.submitPool = &submitPool;
         auto result_parent_child = TestPackageAcceptance(package_parent_child, state, validationState, opt);
 
         BOOST_CHECK(!result_parent_child);
@@ -320,10 +333,6 @@ BOOST_FIXTURE_TEST_CASE(package_orphan_tx_tests, PackageTestSetup)
                 return iter;
         return submitPool.end();
     };
-    CTxMempoolAcceptanceOptions opt;
-    opt.context = ValidationContext(ValidationEntity::PACKAGE);
-    opt.flags = MempoolAcceptanceFlags::TEST_ONLY;
-    opt.submitPool = &submitPool;
 
     CKey spend_key;
     spend_key.MakeNewKey(true);
@@ -352,7 +361,7 @@ BOOST_FIXTURE_TEST_CASE(package_orphan_tx_tests, PackageTestSetup)
 
         //This is the orphan tx as its parent is not known yet
         {
-            CTxMempoolAcceptanceOptions opt;
+            CTxMempoolAcceptanceOptions opt(tx_orphan);
             BOOST_CHECK(!AcceptToMemoryPool(tx_orphan, opt));
             BOOST_CHECK_EQUAL(opt.missingInputs.size(), 1);
         }
@@ -365,8 +374,12 @@ BOOST_FIXTURE_TEST_CASE(package_orphan_tx_tests, PackageTestSetup)
 
         // orphan is in the package as parent transaction
         Package package_parent_child{tx_orphan, tx_gchild};
+        CCachedPackage cachedpkg;
+        CheckPackage(package_parent_child, state, validationState, cachedpkg);
         submitPool.clear();
-
+        CTxMempoolAcceptanceOptions opt(cachedpkg);
+        opt.flags = MempoolAcceptanceFlags::TEST_ONLY;
+        opt.submitPool = &submitPool;
         auto result_parent_child = TestPackageAcceptance(package_parent_child, state, validationState, opt);
 
         BOOST_CHECK(!result_parent_child);
@@ -412,7 +425,7 @@ BOOST_FIXTURE_TEST_CASE(package_orphan_tx_tests, PackageTestSetup)
         //This is the orphan tx as its parent is not known yet
         {
             auto tx_orphan{MakeTransactionRef(mtx_orphan)};
-            CTxMempoolAcceptanceOptions opt;
+            CTxMempoolAcceptanceOptions opt(tx_orphan);
             BOOST_CHECK(!AcceptToMemoryPool(tx_orphan, opt));
             BOOST_CHECK_EQUAL(opt.missingInputs.size(), 1);
         }
@@ -420,8 +433,12 @@ BOOST_FIXTURE_TEST_CASE(package_orphan_tx_tests, PackageTestSetup)
         // orphan is now in the package as child transaction.
         // no error as the parent is now known from the package
         Package package_parent_child{MakeTransactionRef(mtx_parent), MakeTransactionRef(mtx_child), MakeTransactionRef(mtx_orphan)};
+        CCachedPackage cachedpkg;
+        CheckPackage(package_parent_child, state, validationState, cachedpkg);
         submitPool.clear();
-
+        CTxMempoolAcceptanceOptions opt(cachedpkg);
+        opt.flags = MempoolAcceptanceFlags::TEST_ONLY;
+        opt.submitPool = &submitPool;
         auto result_parent_child = TestPackageAcceptance(package_parent_child, state, validationState, opt);
 
         BOOST_CHECK(result_parent_child);
@@ -460,6 +477,8 @@ BOOST_FIXTURE_TEST_CASE(noncontextual_package_tests, PackageTestSetup)
 
     refillCoinbase(50);
 
+    CCachedPackage cachedpkg;
+    PackageValidationState results;
 
     // Parent and Child Package
     {
@@ -473,8 +492,8 @@ BOOST_FIXTURE_TEST_CASE(noncontextual_package_tests, PackageTestSetup)
 
         const CTransactionRef tx_child{MakeTransactionRef(mtx_child)};
         CValidationState state;
-        BOOST_CHECK(CheckPackage({tx_parent, tx_child}, state));
-        BOOST_CHECK(!CheckPackage({tx_child, tx_parent}, state));
+        BOOST_CHECK(CheckPackage({tx_parent, tx_child}, state, results, cachedpkg));
+        BOOST_CHECK(!CheckPackage({tx_child, tx_parent}, state, results, cachedpkg));
         BOOST_CHECK_EQUAL(state.GetRejectCode(), REJECT_PACKAGE_INVALID);
         BOOST_CHECK_EQUAL(state.GetRejectReason(), "package-not-sorted");
         BOOST_CHECK(IsChildWithParents({tx_parent, tx_child}));
@@ -497,7 +516,7 @@ BOOST_FIXTURE_TEST_CASE(noncontextual_package_tests, PackageTestSetup)
 
         CValidationState state;
         package.emplace_back(MakeTransactionRef(child));
-        BOOST_CHECK(CheckPackage(package, state));
+        BOOST_CHECK(CheckPackage(package, state, results, cachedpkg));
         BOOST_CHECK_EQUAL(state.GetRejectCode(), 0);
         BOOST_CHECK_EQUAL(state.GetRejectReason(), "");
 
@@ -507,7 +526,7 @@ BOOST_FIXTURE_TEST_CASE(noncontextual_package_tests, PackageTestSetup)
         Shuffle(package.begin(), package.end(), rng);
         package.emplace_back(MakeTransactionRef(child));
 
-        BOOST_CHECK(CheckPackage(package, state));
+        BOOST_CHECK(CheckPackage(package, state, results, cachedpkg));
         BOOST_CHECK_EQUAL(state.GetRejectCode(), 0);
         BOOST_CHECK_EQUAL(state.GetRejectReason(), "");
         BOOST_CHECK(IsChildWithParents(package));
@@ -515,13 +534,13 @@ BOOST_FIXTURE_TEST_CASE(noncontextual_package_tests, PackageTestSetup)
 
         package.erase(package.begin());
         BOOST_CHECK(IsChildWithParents(package));
-        BOOST_CHECK(CheckPackage(package, state));
+        BOOST_CHECK(CheckPackage(package, state, results, cachedpkg));
         BOOST_CHECK_EQUAL(state.GetRejectCode(), 0);
         BOOST_CHECK_EQUAL(state.GetRejectReason(), "");
 
         package.insert(package.begin(), m_coinbase_txns[index_cb-24]);
         BOOST_CHECK(!IsChildWithParents(package));
-        BOOST_CHECK(CheckPackage(package, state));
+        BOOST_CHECK(CheckPackage(package, state, results, cachedpkg));
         BOOST_CHECK_EQUAL(state.GetRejectCode(), 0);
         BOOST_CHECK_EQUAL(state.GetRejectReason(), "");
     }
@@ -547,10 +566,10 @@ BOOST_FIXTURE_TEST_CASE(noncontextual_package_tests, PackageTestSetup)
         CTransactionRef tx_child{MakeTransactionRef(mtx_child)};
 
         CValidationState state;
-        BOOST_CHECK(CheckPackage({tx_parent, tx_parent_also_child}, state));
-        BOOST_CHECK(CheckPackage({tx_parent, tx_child}, state));
-        BOOST_CHECK(CheckPackage({tx_parent, tx_parent_also_child, tx_child}, state));
-        BOOST_CHECK(!CheckPackage({tx_parent_also_child, tx_parent, tx_child}, state));
+        BOOST_CHECK(CheckPackage({tx_parent, tx_parent_also_child}, state, results, cachedpkg));
+        BOOST_CHECK(CheckPackage({tx_parent, tx_child}, state, results, cachedpkg));
+        BOOST_CHECK(CheckPackage({tx_parent, tx_parent_also_child, tx_child}, state, results, cachedpkg));
+        BOOST_CHECK(!CheckPackage({tx_parent_also_child, tx_parent, tx_child}, state, results, cachedpkg));
         BOOST_CHECK_EQUAL(state.GetRejectCode(), REJECT_PACKAGE_INVALID);
         BOOST_CHECK_EQUAL(state.GetRejectReason(), "package-not-sorted");
     }
@@ -574,11 +593,6 @@ BOOST_FIXTURE_TEST_CASE(package_submission_tests, PackageTestSetup)
     PackageValidationState packageState;
     std::vector<CTxMemPoolEntry> submitPool;
     submitPool.reserve(package_unrelated.size());
-    CTxMempoolAcceptanceOptions opt;
-    opt.context = ValidationContext(ValidationEntity::PACKAGE);
-    opt.flags = MempoolAcceptanceFlags::TEST_ONLY;
-    opt.submitPool = &submitPool;
-    opt.nAbsurdFee = 1 * COIN;
 
     auto find_in_submitpool = [&submitPool](uint256 hashMalFix){
         for(auto iter = submitPool.begin(); iter != submitPool.end(); iter++)
@@ -595,9 +609,15 @@ BOOST_FIXTURE_TEST_CASE(package_submission_tests, PackageTestSetup)
         Sign(vchSig, coinbaseKey, m_coinbase_txns[index_cb]->vout[0].scriptPubKey, 0, mtx_parent, 0);
         mtx_parent.vin[0].scriptSig = CScript() << vchSig;
         package_unrelated.emplace_back(MakeTransactionRef(mtx_parent));
-
     }
+
+    CCachedPackage cachedpkg;
+    CheckPackage(package_unrelated, state, packageState, cachedpkg);
     submitPool.clear();
+    CTxMempoolAcceptanceOptions opt(cachedpkg);
+    opt.flags = MempoolAcceptanceFlags::TEST_ONLY;
+    opt.submitPool = &submitPool;
+    opt.nAbsurdFee = 1 * COIN;
     auto result_unrelated = TestPackageAcceptance(package_unrelated, state, packageState, opt);
 
     // We don't expect m_tx_results for each transaction when basic sanity checks haven't passed.
@@ -652,6 +672,13 @@ BOOST_FIXTURE_TEST_CASE(package_submission_tests, PackageTestSetup)
     {
         submitPool.clear();
         submitPool.reserve(package_3gen.size());
+        CCachedPackage cachedpkg;
+        CheckPackage(package_3gen, state, packageState, cachedpkg);
+        submitPool.clear();
+        CTxMempoolAcceptanceOptions opt(cachedpkg);
+        opt.flags = MempoolAcceptanceFlags::TEST_ONLY;
+        opt.submitPool = &submitPool;
+
         auto result_3gen_submit = TestPackageAcceptance(package_3gen, state, packageState, opt);
         BOOST_CHECK(!result_3gen_submit);
         BOOST_CHECK(state.IsValid());
@@ -684,6 +711,13 @@ BOOST_FIXTURE_TEST_CASE(package_submission_tests, PackageTestSetup)
         Package package_invalid_parent{tx_parent_invalid, tx_child};
         submitPool.clear();
         submitPool.reserve(package_invalid_parent.size());
+        CCachedPackage cachedpkg;
+        CheckPackage(package_invalid_parent, state, packageState, cachedpkg);
+        submitPool.clear();
+        CTxMempoolAcceptanceOptions opt(cachedpkg);
+        opt.flags = MempoolAcceptanceFlags::TEST_ONLY;
+        opt.submitPool = &submitPool;
+
         auto result_quit_early = TestPackageAcceptance(package_invalid_parent, state, packageState, opt);
         BOOST_CHECK(!result_quit_early);
         BOOST_CHECK(state.IsValid());
@@ -713,6 +747,13 @@ BOOST_FIXTURE_TEST_CASE(package_submission_tests, PackageTestSetup)
     {
         submitPool.clear();
         submitPool.reserve(package_missing_parent.size());
+        CCachedPackage cachedpkg;
+        CheckPackage(package_missing_parent, state, packageState, cachedpkg);
+        submitPool.clear();
+        CTxMempoolAcceptanceOptions opt(cachedpkg);
+        opt.flags = MempoolAcceptanceFlags::TEST_ONLY;
+        opt.submitPool = &submitPool;
+
         const auto result_missing_parent = TestPackageAcceptance(package_missing_parent, state, packageState, opt);
         BOOST_CHECK(!result_missing_parent);
         BOOST_CHECK(state.IsValid());

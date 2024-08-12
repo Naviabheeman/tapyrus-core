@@ -182,6 +182,7 @@ add_library(server
         interfaces/handler.cpp
         interfaces/node.cpp
         dbwrapper.cpp
+        mempooloptions.cpp
         merkleblock.cpp
         miner.cpp
         net.cpp

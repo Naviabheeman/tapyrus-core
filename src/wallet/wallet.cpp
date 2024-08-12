@@ -4451,7 +4451,7 @@ bool CWalletTx::AcceptToMemoryPool(const CAmount& nAbsurdFee, CValidationState& 
     // user could call sendmoney in a loop and hit spurious out of funds errors
     // because we think that this newly generated transaction's change is
     // unavailable as we're not yet aware that it is in the mempool.
-    CTxMempoolAcceptanceOptions opt;
+    CTxMempoolAcceptanceOptions opt(tx);
     opt.nAbsurdFee = nAbsurdFee;
     bool ret = ::AcceptToMemoryPool(tx, opt);
     fInMempool |= ret;

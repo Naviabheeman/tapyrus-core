@@ -94,7 +94,7 @@ public:
     CTxMemPoolEntry(const CTransactionRef& _tx, const CAmount& _nFee,
                     int64_t _nTime, unsigned int _entryHeight,
                     bool spendsCoinbase,
-                    int32_t nSigOpsCost, LockPoints lp, uint256 packageHash = uint256());
+                    int32_t nSigOpsCost, LockPoints lp, bool package = false);
 
     const CTransaction& GetTx() const { return *this->tx; }
     CTransactionRef GetSharedTx() const { return this->tx; }
@@ -130,7 +130,7 @@ public:
 
     mutable size_t vTxHashesIdx; //!< Index in mempool's vTxHashes
     // If the transaction is part of a package, this hash is non zero.
-    uint256 packageHash;
+    bool package;
 };
 
 // Helpers for modifying CTxMemPool::mapTx, which is a boost multi_index.
@@ -316,16 +316,6 @@ public:
     }
 };
 
-/* To check whether two mempool entries are part of the same package.
- * Useful in package eviction
- */
-class CompareTxMemPoolEntryByPackageHash{
-public:
-    bool operator()(const CTxMemPoolEntry& a, const CTxMemPoolEntry& b) const
-    {
-        return a.packageHash < b.packageHash;
-    }
-};
 
 
 
@@ -333,7 +323,6 @@ public:
 struct descendant_score {};
 struct entry_time {};
 struct ancestor_score {};
-struct package_hash {};
 
 class CBlockPolicyEstimator;
 
@@ -499,12 +488,6 @@ public:
                 boost::multi_index::tag<ancestor_score>,
                 boost::multi_index::identity<CTxMemPoolEntry>,
                 CompareTxMemPoolEntryByAncestorFee
-            >,
-            // sorted by package hash
-            boost::multi_index::ordered_non_unique<
-                boost::multi_index::tag<package_hash>,
-                boost::multi_index::identity<CTxMemPoolEntry>,
-                CompareTxMemPoolEntryByPackageHash
             >
         >
     > indexed_transaction_set;
@@ -645,7 +628,7 @@ public:
     /** Expire all transaction (and their dependencies) in the mempool older than time. Return the number of removed transactions. */
     int Expire(int64_t time);
 
-    int RemovePackage(const uint256 packageHash);
+    int RemovePackage();
     /**
      * Calculate the ancestor and descendant count for the given transaction.
      * The counts include the transaction itself.
@@ -731,20 +714,12 @@ private:
  */
 class CCoinsViewMemPool : public CCoinsViewBacked
 {
-    /**
-    * Coins made available by transactions being validated. Tracking these allows for package
-    * validation, since we can access transaction outputs without submitting them to mempool.
-    */
-    std::unordered_map<COutPoint, Coin, SaltedOutpointHasher> packagePool;
 protected:
     const CTxMemPool& mempool;
 
 public:
     CCoinsViewMemPool(CCoinsView* baseIn, const CTxMemPool& mempoolIn);
     bool GetCoin(const COutPoint &outpoint, Coin &coin) const override;
-    /** Add the coins created by this transaction. These coins are only temporarily stored in
-     * m_temp_added and cannot be flushed to the back end. Only used for package validation. */
-    void AddToPackagePool(const CTransactionRef& tx);
 };
 
 /**
@@ -838,70 +813,5 @@ struct DisconnectedBlockTransactions {
     }
 };
 
-
-/* is the tx validation stand alone or part of a bigger entity */
-enum class ValidationEntity {
-    TRANSACTION,
-    BLOCK,
-    INDEX,
-    PACKAGE
-};
-
-struct ValidationContext {
-    ValidationEntity type;
-    uint256 hash;
-    ValidationContext(const ValidationEntity _type, const uint256 _hash = uint256()):type(_type), hash(_hash){}
-};
-
-/* Options to change the behaviour of Accept to mempool
-* these are intended to be consolidated in one integer as flag
-* int flags = BYPASSS_LIMITS | TEST_ONLY
-*/
-enum class MempoolAcceptanceFlags
-{
-    NONE = 0,
-    BYPASSS_LIMITS = 1,
-    TEST_ONLY = 2
-};
-
-inline MempoolAcceptanceFlags operator|=(MempoolAcceptanceFlags a, MempoolAcceptanceFlags b)
-{
-    return static_cast<MempoolAcceptanceFlags>(static_cast<int>(a) | static_cast<int>(b));
-}
-
-inline MempoolAcceptanceFlags operator&=(MempoolAcceptanceFlags a, MempoolAcceptanceFlags b)
-{
-    return static_cast<MempoolAcceptanceFlags>(static_cast<int>(a) & static_cast<int>(b));
-}
-
-inline bool operator|(MempoolAcceptanceFlags a, MempoolAcceptanceFlags b)
-{
-    return ((static_cast<int>(a) | static_cast<int>(b)) > 0);
-}
-
-inline bool operator&(MempoolAcceptanceFlags a, MempoolAcceptanceFlags b)
-{
-    return ((static_cast<int>(a) & static_cast<int>(b)) > 0);
-}
-
-/* All configurable inputs and outputs of accept to mempool are consolidated here for ease of use*/
-struct CTxMempoolAcceptanceOptions {
-    ValidationContext context;
-    MempoolAcceptanceFlags flags;
-    CAmount nAbsurdFee;
-    CValidationState state;
-    int64_t nAcceptTime;
-    CCoinsViewMemPool* mempool_view;
-    std::vector<CTransactionRef> txnReplaced;
-    std::vector<COutPoint> coins_to_uncache;
-    std::vector<COutPoint> missingInputs;
-    std::vector<CTxMemPoolEntry >* submitPool;
-
-    CTxMempoolAcceptanceOptions();
-    ~CTxMempoolAcceptanceOptions() {
-        delete mempool_view;
-        mempool_view = nullptr;
-    }
-};
 
 #endif // BITCOIN_TXMEMPOOL_H

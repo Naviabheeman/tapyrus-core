@@ -42,7 +42,7 @@ BOOST_FIXTURE_TEST_CASE(tx_mempool_reject_coinbase, TestChainSetup)
 
     unsigned int initialPoolSize = mempool.size();
 
-    CTxMempoolAcceptanceOptions opt;
+    CTxMempoolAcceptanceOptions opt(MakeTransactionRef(coinbaseTx));
     opt.flags = MempoolAcceptanceFlags::BYPASSS_LIMITS;
     BOOST_CHECK_EQUAL(
             false,
@@ -83,7 +83,7 @@ namespace
 
 void testTx(TestChainSetup* setup, const CTransactionRef tx, bool success, std::string errStr="")
 {
-    CTxMempoolAcceptanceOptions opt;
+    CTxMempoolAcceptanceOptions opt(tx);
     opt.flags = MempoolAcceptanceFlags::BYPASSS_LIMITS;
     {
         LOCK(cs_main);

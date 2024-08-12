@@ -119,7 +119,7 @@ static void AssembleBlock(benchmark::State& state)
         LOCK(::cs_main); // Required for ::AcceptToMemoryPool.
 
         for (const auto& txr : txs) {
-            CTxMempoolAcceptanceOptions opt;
+            CTxMempoolAcceptanceOptions opt(txr);
             opt.flags = MempoolAcceptanceFlags::BYPASSS_LIMITS;
             bool ret{::AcceptToMemoryPool(txr, opt)};
             assert(ret);

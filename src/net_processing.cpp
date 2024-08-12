@@ -31,7 +31,6 @@
 #include <utilstrencodings.h>
 #include <util.h>
 #include <trace.h>
-#include <validation.h>
 
 #include <memory>
 #include <array>
@@ -39,6 +38,7 @@
 #if defined(NDEBUG)
 # error "Tapyrus cannot be compiled without assertions."
 #endif
+
 
 /** Expiration time for orphan transactions in seconds */
 static constexpr int64_t ORPHAN_TX_EXPIRE_TIME = 20 * 60;
@@ -2168,7 +2168,7 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
         pfrom->setAskFor.erase(inv.hash);
         mapAlreadyAskedFor.erase(inv.hash);
 
-        CTxMempoolAcceptanceOptions opt;
+        CTxMempoolAcceptanceOptions opt(ptx);
         if (!AlreadyHave(inv) &&
             AcceptToMemoryPool(ptx, opt)) {
             mempool.check(pcoinsTip.get());
@@ -2205,7 +2205,7 @@ bool static ProcessMessage(CNode* pfrom, const std::string& strCommand, CDataStr
 
                     if (setMisbehaving.count(fromPeer))
                         continue;
-                    CTxMempoolAcceptanceOptions opt2;
+                    CTxMempoolAcceptanceOptions opt2(porphanTx);
                     if (AcceptToMemoryPool(porphanTx, opt2)) {
                         LogPrint(BCLog::MEMPOOL, "   accepted orphan tx %s\n", orphanHash.ToString());
                         RelayTransaction(orphanTx, connman);

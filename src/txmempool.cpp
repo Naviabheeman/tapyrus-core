@@ -22,11 +22,10 @@
 
 CTxMemPoolEntry::CTxMemPoolEntry(const CTransactionRef& _tx, const CAmount& _nFee,
                                  int64_t _nTime, unsigned int _entryHeight,
-                                 bool _spendsCoinbase, int32_t _sigOpsCost, LockPoints lp,
-                                 uint256 _packageHash):
+                                 bool _spendsCoinbase, int32_t _sigOpsCost, LockPoints lp, bool _package):
     tx(_tx), nFee(_nFee), nTime(_nTime), entryHeight(_entryHeight),
     spendsCoinbase(_spendsCoinbase), sigOpCost(_sigOpsCost), lockPoints(lp),
-    packageHash(_packageHash)
+    package(_package)
 {
     nTxSize = GetSerializeSize(tx, SER_NETWORK, PROTOCOL_VERSION);
     nUsageSize = RecursiveDynamicUsage(tx);
@@ -423,6 +422,7 @@ void CTxMemPool::addUnchecked(const uint256& hash, const CTxMemPoolEntry &entry,
 
 void CTxMemPool::removeUnchecked(txiter it, MemPoolRemovalReason reason)
 {
+    LogPrintf("remove tx %s \n", it->GetTx().GetHashMalFix().ToString());
     NotifyEntryRemoved(it->GetSharedTx(), reason);
 
     TRACE5(mempool, removed,
@@ -476,18 +476,12 @@ void CTxMemPool::CalculateDescendants(txiter entryit, setEntries& setDescendants
 
         const setEntries &setChildren = GetMemPoolChildren(it);
         for (const txiter &childiter : setChildren) {
+            LogPrintf("AcceptToMemoryPool:GetMemPoolChildren %d nConflictingSize: %d \n", childiter->GetTx().GetHashMalFix().ToString());
+
             if (!setDescendants.count(childiter)) {
                 stage.insert(childiter);
-            }
-        }
-            //if the transaction being evicted is part of a package then add all package transactions to its decendants
-        if(!it->packageHash.IsNull()) {
-            LogPrint(BCLog::MEMPOOL, "CalculateDescendants: Check package %s \n", it->packageHash.ToString().c_str());
+                LogPrintf("AcceptToMemoryPool: insert \n");
 
-            indexed_transaction_set::index<package_hash>::type::iterator pkgit = mapTx.get<package_hash>().begin();
-            while (pkgit != mapTx.get<package_hash>().end() && pkgit->packageHash == it->packageHash) {
-                stage.insert(mapTx.project<0>(pkgit));
-                pkgit++;
             }
         }
     }
@@ -519,11 +513,11 @@ void CTxMemPool::removeRecursive(const CTransaction &origTx, MemPoolRemovalReaso
         setEntries setAllRemoves;
         for (txiter it : txToRemove) {
             CalculateDescendants(it, setAllRemoves);
-            if(!it->packageHash.IsNull())
+            if(!it->package)
             {
-                LogPrint(BCLog::MEMPOOL, "Remove package %s from mempool \n", it->packageHash.ToString().c_str());
+                LogPrint(BCLog::MEMPOOL, "Remove package from mempool \n");
 
-                RemovePackage(it->packageHash);
+                RemovePackage();
             }
         }
 
@@ -919,13 +913,6 @@ bool CTxMemPool::HasNoInputsOf(const CTransaction &tx) const
 CCoinsViewMemPool::CCoinsViewMemPool(CCoinsView* baseIn, const CTxMemPool& mempoolIn) : CCoinsViewBacked(baseIn), mempool(mempoolIn) { }
 
 bool CCoinsViewMemPool::GetCoin(const COutPoint &outpoint, Coin &coin) const {
-    // Check to see if the inputs are made available by another tx in the package.
-    // These Coins would not be available in the underlying CoinsView.
-    if (auto it = packagePool.find(outpoint); it != packagePool.end()) {
-        coin = it->second;
-        return true;
-    }
-
     // If an entry in the mempool exists, always return that one, as it's guaranteed to never
     // conflict with the underlying cache, and it cannot have pruned entries (as it contains full)
     // transactions. First checking the underlying cache risks returning a pruned entry instead.
@@ -933,20 +920,18 @@ bool CCoinsViewMemPool::GetCoin(const COutPoint &outpoint, Coin &coin) const {
     if (ptx) {
         if (outpoint.n < ptx->vout.size()) {
             coin = Coin(ptx->vout[outpoint.n], MEMPOOL_HEIGHT, false);
+            LogPrintf(" CCoinsViewMemPool::GetCoin in mempool: %s, %d, %d\n", coin.out.ToString().c_str(), coin.nHeight, coin.IsSpent());
+
             return true;
         } else {
+            LogPrintf(" CCoinsViewMemPool::GetCoin not in memPool\n");
+
             return false;
         }
     }
     return base->GetCoin(outpoint, coin);
 }
 
-void CCoinsViewMemPool::AddToPackagePool(const CTransactionRef& tx)
-{
-    for (unsigned int n = 0; n < tx->vout.size(); ++n) {
-        packagePool.emplace(COutPoint(tx->GetHashMalFix(), n), Coin(tx->vout[n], MEMPOOL_HEIGHT, false));
-    }
-}
 
 size_t CTxMemPool::DynamicMemoryUsage() const {
     LOCK(cs);
@@ -978,11 +963,11 @@ int CTxMemPool::Expire(int64_t time) {
     return stage.size();
 }
 
-int CTxMemPool::RemovePackage(const uint256 packageHash) {
+int CTxMemPool::RemovePackage() {
     LOCK(cs);
-    indexed_transaction_set::index<package_hash>::type::iterator it = mapTx.get<package_hash>().begin();
+    indexed_transaction_set::iterator it = mapTx.begin();
     setEntries toremove;
-    while (it != mapTx.get<package_hash>().end() && it->packageHash == packageHash) {
+    while (it != mapTx.end() && it->package) {
         toremove.insert(mapTx.project<0>(it));
         it++;
     }
@@ -1162,4 +1147,4 @@ std::string RemovalReasonToString(const MemPoolRemovalReason& r) noexcept
         case MemPoolRemovalReason::UNKNOWN: return "unknown";
     }
 }
-CTxMempoolAcceptanceOptions:: CTxMempoolAcceptanceOptions():context(ValidationEntity::TRANSACTION), flags(MempoolAcceptanceFlags::NONE), nAbsurdFee(0), nAcceptTime(0), mempool_view(new CCoinsViewMemPool(pcoinsTip.get(), mempool)){}
+

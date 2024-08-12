@@ -131,6 +131,7 @@ BITCOIN_CORE_H = \
   memusage.h \
   merkleblock.h \
   miner.h \
+  mempooloptions.h \
   net.h \
   net_processing.h \
   netaddress.h \
@@ -230,6 +231,7 @@ libtapyrus_server_a_SOURCES = \
   index/txindex.cpp \
   init.cpp \
   dbwrapper.cpp \
+  mempooloptions.cpp \
   merkleblock.cpp \
   miner.cpp \
   net.cpp \
