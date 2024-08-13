@@ -14,7 +14,7 @@
 #include <serialize.h>
 #include <clientversion.h>
 
-bool CheckPackage(const Package& txns, CValidationState& state, PackageValidationState& results, CCachedPackage& cachedPackage)
+bool CheckPackage(const Package& txns, CValidationState& state)
 {
     const unsigned int package_count = txns.size();
 
@@ -52,10 +52,10 @@ bool CheckPackage(const Package& txns, CValidationState& state, PackageValidatio
     }
 
     // Don't allow any conflicting transactions, i.e. spending the same inputs, in a package.
-    //std::unordered_set<COutPoint, SaltedOutpointHasher> inputs_seen;
+    std::unordered_set<COutPoint, SaltedOutpointHasher> inputs_seen;
     for (const auto& tx : txns) {
         for (const auto& input : tx->vin) {
-            if (cachedPackage.inputs.find(input.prevout) != cachedPackage.inputs.end()) {
+            if (inputs_seen.find(input.prevout) != inputs_seen.end()) {
                 // This input is also present in another tx in the package.
                 return state.Invalid(false, REJECT_PACKAGE_INVALID, "conflict-in-package");
             }
@@ -63,15 +63,18 @@ bool CheckPackage(const Package& txns, CValidationState& state, PackageValidatio
         // Batch-add all the inputs for a tx at a time. If we added them 1 at a time, we could
         // catch duplicate inputs within a single tx.  This is a more severe, consensus error,
         // and we want to report that from CheckTransaction instead.
-        std::transform(tx->vin.cbegin(), tx->vin.cend(), std::inserter(cachedPackage.inputs, cachedPackage.inputs.end()),
+        std::transform(tx->vin.cbegin(), tx->vin.cend(), std::inserter(inputs_seen, inputs_seen.end()),
                        [](const auto& input) { return input.prevout; });
     }
+    return true;
+}
 
-    // Don't allow any mempool conflicting transactions,
+bool TransformPackage(const Package& txns, CCachedPackage& cachedPackage, PackageValidationState& results) {
+    // Don't allow any mempool conflicting transactions
     std::vector<CTransactionRef> duplicates;
 
-    for(const auto& tx : txns) {
-        if(mempool.exists(tx->GetHashMalFix())) {
+    for (const auto& tx : txns) {
+        if (mempool.exists(tx->GetHashMalFix())) {
             CValidationState state;
             state.Invalid(false, REJECT_DUPLICATE, "txn-already-in-mempool");
             results.emplace(tx->GetHashMalFix(), state);
@@ -82,7 +85,7 @@ bool CheckPackage(const Package& txns, CValidationState& state, PackageValidatio
         }
     }
 
-    // identify the parent child relationships within the package.
+    // Identify the parent-child relationships within the package
     for (const auto& intx : cachedPackage) {
         packageEntries allchildren;
 
@@ -90,6 +93,7 @@ bool CheckPackage(const Package& txns, CValidationState& state, PackageValidatio
             for (const auto& in : spendtx->vin) {
                 if (intx->GetHashMalFix() == in.prevout.hashMalFix) {
                     allchildren.emplace(spendtx->GetHashMalFix()); // Add child transaction hash
+                    cachedPackage.inputs.emplace(in.prevout); // Ensure in is of the correct type
                 }
             }
         }
@@ -97,6 +101,12 @@ bool CheckPackage(const Package& txns, CValidationState& state, PackageValidatio
         // Only add to children if there are any children found
         if (!allchildren.empty()) {
             cachedPackage.children.emplace(intx->GetHashMalFix(), std::move(allchildren));
+        }
+
+        // Log the transaction and its children
+        LogPrintf("CheckPackage: tx: %s children:\n", intx->GetHashMalFix().ToString());
+        for (const auto& x : allchildren) {
+            LogPrintf("\t\t %s\n", x.GetHex());
         }
     }
 
@@ -106,7 +116,11 @@ bool CheckPackage(const Package& txns, CValidationState& state, PackageValidatio
 CCoinsViewPackage::CCoinsViewPackage(CCoinsView* baseIn, const CTxMemPool& mempoolIn, const CCachedPackage& packageIn) : CCoinsViewMemPool(baseIn, mempoolIn), packageCache(packageIn) {
 
     for(auto &tx:packageCache)
+    {
         ::CCoinsViewPackage::AddCoins(tx);
+        LogPrintf("CCoinsViewPackage:: tx: %s\n", tx->GetHashMalFix().ToString());
+    }
+
 }
 
 bool CCoinsViewPackage::GetCoin(const COutPoint &outpoint, Coin &coin) const {
@@ -136,7 +150,7 @@ void CCoinsViewPackage::AddCoin(const COutPoint &outpoint, Coin&& coin)
     it->second.coin = std::move(coin);
     it->second.flags |= CCoinsCacheEntry::DIRTY | CCoinsCacheEntry::FRESH;
 
-    LogPrintf("AddCoin: %s, %d, %d\n", coin.out.ToString().c_str(), coin.nHeight, coin.IsSpent());
+    LogPrintf("CCoinsViewPackage::AddCoin: %s, %d, %d\n", coin.out.ToString().c_str(), coin.nHeight, coin.IsSpent());
 }
 
 void CCoinsViewPackage::AddCoins(const CTransactionRef& tx) {

@@ -9,14 +9,14 @@
 #include <txmempool.h>
 #include <mempooloptions.h>
 
-bool TestPackageAcceptance(const Package& package,
+MempoolPackage TestPackageAcceptance(const Package& transactions,
+                                  const CAmount max_raw_tx_fee,
                                   CValidationState& state,
-                                  PackageValidationState& results,
-                                  CTxMempoolAcceptanceOptions& opt);
+                                  PackageValidationState& pkg_results);
 
-bool SubmitPackageToMempool(const PackageInMempool& validPool, CValidationState& state);
+bool SubmitPackageToMempool(const MempoolPackage& mempoolPkg, CValidationState& state);
 
-void RemovePackageFromMempool(const PackageInMempool& validPool);
+void RemovePackageFromMempool(const MempoolPackage& mempoolPkg);
 
 bool ArePackageTransactionsAccepted(const PackageValidationState& results);
 

@@ -47,18 +47,36 @@ static void encodePackageResult(bool success, const PackageValidationState& pkg_
     }
 }
 
-bool TestPackageAcceptance(const Package& package,
+MempoolPackage TestPackageAcceptance(const Package& transactions,
+                                  const CAmount max_raw_tx_fee,
                                   CValidationState& state,
-                                  PackageValidationState& results,
-                                  CTxMempoolAcceptanceOptions& opt)
+                                  PackageValidationState& pkg_results)
 {
+    //make a package with only unknown transactions i.e. omit transactions which are already in the mempool
+    CCachedPackage chachedPackage;
 
+    if(!CheckPackage(transactions, state))
+    {
+        throw JSONRPCError(RPC_INVALID_PARAMETER,
+                    "package acceptance failed: " + state.Describe());
+    }
+    TransformPackage(transactions, chachedPackage, pkg_results);
+
+    CTxMempoolAcceptanceOptions opt(chachedPackage);
+    opt.flags = MempoolAcceptanceFlags::TEST_ONLY;
+    opt.flags |= MempoolAcceptanceFlags::BYPASSS_LIMITS;
+    opt.nAbsurdFee = max_raw_tx_fee;
+
+    std::vector<CTxMemPoolEntry> mempoolPkg;
+    mempoolPkg.reserve(transactions.size());
+    opt.mempoolPkg = &mempoolPkg;
 
     bool all_valid = true;
     bool test_accept_res = false;
 
     // testmempool acceptance first
-    for(auto &tx : package) {
+    for(auto &tx : chachedPackage)
+    {
         {
             opt.state = CValidationState();
             LOCK(::cs_main);
@@ -66,16 +84,17 @@ bool TestPackageAcceptance(const Package& package,
         }
 
         opt.state.missingInputs = opt.missingInputs.size() > 0;
-        results.emplace(tx->GetHashMalFix(), opt.state);
+        pkg_results.emplace(tx->GetHashMalFix(), opt.state);
         all_valid &= test_accept_res;
     }
 
-    return all_valid;
+    return mempoolPkg;
 }
 
-bool SubmitPackageToMempool(const PackageInMempool& validPool, CValidationState& state)
+bool SubmitPackageToMempool(const MempoolPackage& mempoolPkg, CValidationState& state)
 {
-    for(auto &entry : validPool) {
+    for(auto &entry : mempoolPkg)
+    {
         auto &tx(entry.GetTx());
         {
             // Store transaction in mempool if validation succeeded
@@ -93,11 +112,11 @@ bool SubmitPackageToMempool(const PackageInMempool& validPool, CValidationState&
 
     // check if any of the package transaction were evited because of a full mempool
     // if so remove all package transactions from mempool and return error
-    for(auto &entry : validPool) {
+    for(auto &entry : mempoolPkg) {
         auto &tx(entry.GetTx());
         if (!mempool.exists(tx.GetHashMalFix()))
         {
-            RemovePackageFromMempool(validPool);
+            RemovePackageFromMempool(mempoolPkg);
             return state.DoS(0, false, REJECT_PACKAGE_MEMPOOL, "mempool full");
         }
     }
@@ -105,9 +124,9 @@ bool SubmitPackageToMempool(const PackageInMempool& validPool, CValidationState&
     return true;
 }
 // remove package transaction from mempool if it was rejected due to a full mempool
-void RemovePackageFromMempool(const PackageInMempool& validPool)
+void RemovePackageFromMempool(const MempoolPackage& mempoolPkg)
 {
-    for(auto &entry : validPool) {
+    for(auto &entry : mempoolPkg) {
         auto &tx(entry.GetTx());
         mempool.removeRecursive(tx, MemPoolRemovalReason::PACKAGE);
     }
@@ -163,14 +182,14 @@ static UniValue testmempoolaccept(const JSONRPCRequest& request)
                             "Too many transactions in package." );
     }
 
-    std::vector<CTransaction> transactions;
+    Package transactions;
     for (const auto& rawtx : raw_transactions.getValues()) {
         CMutableTransaction mtx;
         if (!DecodeHexTx(mtx, rawtx.get_str())) {
             throw JSONRPCError(RPC_DESERIALIZATION_ERROR,
                                 "TX decode failed: " + rawtx.get_str() + " Make sure the tx has at least one input.");
         }
-        transactions.push_back(std::move(mtx));
+        transactions.push_back(MakeTransactionRef(mtx));
     }
 
     CAmount max_raw_tx_fee = ::maxTxFee;
@@ -178,28 +197,11 @@ static UniValue testmempoolaccept(const JSONRPCRequest& request)
         max_raw_tx_fee = 0;
     }
 
-    //make a package with only unknown transactions i.e. omit transactions which are already in the mempool
-    Package package;
     CValidationState state;
     PackageValidationState pkg_results;
-    CCachedPackage chachedPackage;
 
-    if(!CheckPackage(package, state, pkg_results, chachedPackage))
-    {
-        throw JSONRPCError(RPC_INVALID_PARAMETER,
-                    "package acceptance failed: " + state.Describe());
-    }
-
-    std::vector<CTxMemPoolEntry> submitPool;
-    submitPool.reserve(package.size());
-
-    CTxMempoolAcceptanceOptions opt(chachedPackage);
-    opt.flags = MempoolAcceptanceFlags::TEST_ONLY;
-    opt.flags |= MempoolAcceptanceFlags::BYPASSS_LIMITS;
-    opt.submitPool = &submitPool;
-    opt.nAbsurdFee = max_raw_tx_fee;
-
-    bool success = TestPackageAcceptance(package, state, pkg_results, opt);
+    MempoolPackage mempoolPkg = TestPackageAcceptance(transactions, max_raw_tx_fee, state, pkg_results);
+    bool success = mempoolPkg.size() == transactions.size();
 
     UniValue result(UniValue::VOBJ);
     encodePackageResult(success, pkg_results, state, result);
@@ -233,14 +235,14 @@ static UniValue submitpackage(const JSONRPCRequest& request)
                             "Too many transactions in package");
     }
 
-    std::vector<CTransaction> transactions;
+    Package transactions;
     for (const auto& rawtx : raw_transactions.getValues()) {
         CMutableTransaction mtx;
         if (!DecodeHexTx(mtx, rawtx.get_str())) {
             throw JSONRPCError(RPC_DESERIALIZATION_ERROR,
                                 "TX decode failed: " + rawtx.get_str() + " Make sure the tx has at least one input.");
         }
-        transactions.push_back(std::move(mtx));
+        transactions.push_back(MakeTransactionRef(mtx));
     }
 
     CAmount max_raw_tx_fee = ::maxTxFee;
@@ -248,32 +250,15 @@ static UniValue submitpackage(const JSONRPCRequest& request)
         max_raw_tx_fee = 0;
     }
 
-    //make a package with only unknown transactions i.e. omit transactions which are already in the mempool
-    Package package;
     CValidationState state;
     PackageValidationState pkg_results;
-    CCachedPackage chachedPackage;
 
-    if(!CheckPackage(package, state, pkg_results, chachedPackage))
-    {
-        throw JSONRPCError(RPC_INVALID_PARAMETER,
-                    "package acceptance failed: " + state.Describe());
-    }
-
-    std::vector<CTxMemPoolEntry> submitPool;
-    submitPool.reserve(package.size());
-
-    CTxMempoolAcceptanceOptions opt(chachedPackage);
-    opt.flags = MempoolAcceptanceFlags::TEST_ONLY;
-    opt.flags |= MempoolAcceptanceFlags::BYPASSS_LIMITS;
-    opt.submitPool = &submitPool;
-    opt.nAbsurdFee = max_raw_tx_fee;
-
-    bool success = TestPackageAcceptance(package, state, pkg_results, opt);
+    MempoolPackage mempoolPkg = TestPackageAcceptance(transactions, max_raw_tx_fee, state, pkg_results);
+    bool success = mempoolPkg.size() == transactions.size();
 
     if(success && ArePackageTransactionsAccepted(pkg_results))
     {
-        success = SubmitPackageToMempool(submitPool, state);
+        success = SubmitPackageToMempool(mempoolPkg, state);
     }
 
     UniValue result(UniValue::VOBJ);

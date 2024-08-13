@@ -31,10 +31,24 @@ static constexpr uint32_t MAX_PACKAGE_COUNT{25};
  * same inputs as) one another. */
 using Package = std::vector<CTransactionRef>;
 
+/** A package that has been checked for package validity
+ * It caches the set of inputs spent in the package and
+ * a map of input txid to children within the package.
+ * */
+
+using packageEntries = std::set<uint256>;
+
+struct CCachedPackage: public Package {
+    std::unordered_set<COutPoint, SaltedOutpointHasher> inputs;
+    std::map<const uint256, packageEntries> children;
+
+    void CalculatePackageDescendants(const uint256 hashMalFix, packageEntries& setDescendants) const;
+};
+
 /** A list of all packages in the mempool but not in any block yet.
  * Tracking this helps in package eviction and accurate fee estimation.
  * */
-using PackageInMempool = std::vector<CTxMemPoolEntry>;
+using MempoolPackage = std::vector<CTxMemPoolEntry>;
 
 /** Package validation results are actually the result of
  * validationg each transaction in the package 
@@ -46,19 +60,6 @@ struct PackageCompareIteratorByHash {
     bool operator()(const uint256&a, const uint256 &b) const {
         return a < b;
     }
-};
-
-using packageEntries = std::set<uint256>;
-
-/** A package that has been checked for package validity
- * It caches the set of inputs spent in the package and
- * a map of input txid to children within the package.
- * */
-struct CCachedPackage: public std::vector<CTransactionRef> {
-    std::unordered_set<COutPoint, SaltedOutpointHasher> inputs;
-    std::map<const uint256, packageEntries> children;
-
-    void CalculatePackageDescendants(const uint256 hashMalFix, packageEntries& setDescendants) const;
 };
 
 /**
@@ -104,7 +105,13 @@ public:
  * 3. If any dependencies exist between transactions, parents must appear before children.
  * 4. Transactions cannot conflict, i.e., spend the same inputs.
  * */
-bool CheckPackage(const Package& txns, CValidationState& state, PackageValidationState& results, CCachedPackage& cachedPackage);
+bool CheckPackage(const Package& txns, CValidationState& state);
+
+/* Convert package into an indexed package that:
+ * 1. does not have any transction already in mempool
+ * 2. can list all inputs and parent child relationships
+*/
+bool TransformPackage(const Package& txns, CCachedPackage& cachedPackage, PackageValidationState& results);
 
 
 

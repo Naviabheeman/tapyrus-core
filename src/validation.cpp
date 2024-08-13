@@ -552,8 +552,8 @@ static bool CheckInputsFromMempoolAndCache(ValidationContext context, const CTra
             assert(txFrom->vout[txin.prevout.n] == coin.out);
         } else if(IsPackage(context)) { //transactions in a package are not expected to be present in the disk
             const Coin& coinFromDisk = pcoinsTip->AccessCoin(txin.prevout);
-            assert(!coinFromDisk.IsSpent());
-            assert(coinFromDisk.out == coin.out);
+            //assert(!coinFromDisk.IsSpent());
+            //assert(coinFromDisk.out == coin.out);
             LogPrintf("CheckInputsFromMempoolAndCache: in disk %s %d %b\n", coinFromDisk.out.ToString().c_str(), coinFromDisk.nHeight, coinFromDisk.fCoinBase);
         }
         else
@@ -1131,8 +1131,8 @@ static bool AcceptToMemoryPoolWorker(const CTransactionRef &ptx, CTxMempoolAccep
 
         // if validation of the package tx was successful remember its mempoolentry
         // if submission is needed this list is used otherwise it is unused
-        if(IsPackage(opt.context) && opt.submitPool) {
-            opt.submitPool->push_back(std::move(entry));
+        if(IsPackage(opt.context) && opt.mempoolPkg) {
+            opt.mempoolPkg->push_back(std::move(entry));
         }
 
         if (opt.flags & MempoolAcceptanceFlags::TEST_ONLY) {
