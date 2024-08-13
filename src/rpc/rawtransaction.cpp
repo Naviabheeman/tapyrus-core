@@ -754,8 +754,6 @@ UniValue SignTransaction(CMutableTransaction& mtx, const UniValue& prevTxsUnival
 
         for (const CTxIn& txin : mtx.vin) {
             const Coin& coin = view.AccessCoin(txin.prevout); // Load entries from viewChain into view; can fail.
-            LogPrintf("SignTransaction 1: %s, %d, %d\n", coin.out.ToString().c_str(), coin.nHeight, coin.IsSpent());
-
         }
 
         view.SetBackend(viewDummy); // switch back to avoid locking mempool for too long
@@ -792,8 +790,6 @@ UniValue SignTransaction(CMutableTransaction& mtx, const UniValue& prevTxsUnival
 
             {
                 const Coin& coin = view.AccessCoin(out);
-                LogPrintf("SignTransaction 2: %s, %d, %d\n", out.ToString().c_str(), coin.nHeight, coin.IsSpent());
-
                 if (!coin.IsSpent() && coin.out.scriptPubKey != scriptPubKey) {
                     std::string err("Previous output scriptPubKey mismatch:\n");
                     err = err + ScriptToAsmStr(coin.out.scriptPubKey) + "\nvs:\n"+
@@ -843,7 +839,6 @@ UniValue SignTransaction(CMutableTransaction& mtx, const UniValue& prevTxsUnival
         CTxIn& txin = mtx.vin[i];
         const Coin& coin = view.AccessCoin(txin.prevout);
         if (coin.IsSpent()) {
-            LogPrintf("SignTransaction 3: %s, %d, %d\n", coin.out.ToString().c_str(), coin.nHeight, coin.IsSpent());
             TxInErrorToJSON(txin, vErrors, "Input not found or already spent");
             continue;
         }

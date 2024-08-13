@@ -923,12 +923,10 @@ bool CCoinsViewMemPool::GetCoin(const COutPoint &outpoint, Coin &coin) const {
             LogPrintf(" CCoinsViewMemPool::GetCoin in mempool: %s, %d, %d\n", coin.out.ToString().c_str(), coin.nHeight, coin.IsSpent());
 
             return true;
-        } else {
-            LogPrintf(" CCoinsViewMemPool::GetCoin not in memPool\n");
-
+        } else
             return false;
-        }
     }
+    LogPrintf(" CCoinsViewMemPool::GetCoin not in memPool. check base %p\n", base);
     return base->GetCoin(outpoint, coin);
 }
 

@@ -34,11 +34,9 @@ class MempoolLimitTest(BitcoinTestFramework):
 
     def set_test_params(self):
         self.setup_clean_chain = True
-        self.num_nodes = 4
-        self.extra_args = [["-maxmempool=5"],
-                           ["-maxmempool=5"],
-                           ["-maxmempool=5"],
-                           ["-maxmempool=5"]]
+        self.num_nodes = 5
+        self.extra_args = [["-maxmempool=5"]] * self.num_nodes
+
     def deduct_fee(self, tx, feerate):
         tx.vout[0].nValue -= int(feerate / 1000 * tx_size(tx) * COIN)
         #round(tx.vout[0].nValue, 6)
@@ -105,7 +103,7 @@ class MempoolLimitTest(BitcoinTestFramework):
     def create_package(self, node, utxos, mempool_evicted_utxo, feerate, size=5, large=False):
         # create size-1 parent transactions and one child transaction spend all parents
         # one of them should spend the mempool_evicted_utxo
-        self.log.info("Create package transactions")
+        self.log.info("Create package transactions %s" % mempool_evicted_utxo)
         parent_txs = []
         package_hex =[]
         package_txids = []
@@ -121,6 +119,7 @@ class MempoolLimitTest(BitcoinTestFramework):
         # create parent transactions
         for parent_spend in spend_utxos:
             (parent_tx, parent_hex) = self.create_signed_raw_tx(node, parent_spend, feerate)
+            self.log.info("parent : %s" % parent_tx.hashMalFix)
             parent_txs.append(parent_tx)
             package_hex.append(parent_hex)
             package_txids.append(parent_tx.hashMalFix)
@@ -151,6 +150,7 @@ class MempoolLimitTest(BitcoinTestFramework):
         assert_equal(raw_child["complete"], True)
         package_hex.append(raw_child['hex'])
         package_txids.append(child.hashMalFix)
+        self.log.info("child : %s" % child.hashMalFix)
         return (package_hex, package_txids)
 
     def create_tx_to_be_evicted(self, node, unspent, feerate):
@@ -254,7 +254,7 @@ class MempoolLimitTest(BitcoinTestFramework):
 
         utxos = [utxo for utxo in node.listunspent()if utxo['amount'] >  mempoolmin_feerate * 100]
 
-        (package_hex, txids) = self.create_package(node, utxos, mempool_evicted_utxo, mempoolmin_feerate)
+        (package_hex, txids) = self.create_package(node, utxos, mempool_evicted_utxo, mempoolmin_feerate, large=True)
 
         self.log.info("Submit package transactions")
         res = self.submitpackage(node, package_hex)
@@ -365,6 +365,7 @@ class MempoolLimitTest(BitcoinTestFramework):
         replaced_tx_hex = node.signrawtransactionwithwallet(replaced_tx.serialize().hex(), [double_spent_utxo], "ALL", self.options.scheme)
         assert_equal(replaced_tx_hex["complete"], True)
         txid = node.sendrawtransaction(replaced_tx_hex['hex'])
+        self.log.debug("replaced_tx: %s", txid)
 
         # Already in mempool when package is submitted.
         assert txid in node.getrawmempool()
@@ -374,16 +375,16 @@ class MempoolLimitTest(BitcoinTestFramework):
         # reconsideration), and its inputs are cached. When the mempool transaction is evicted, its
         # coin is no longer available, but the cache could still contain the tx.
         replaced_tx_utxo = {"txid": replaced_tx.hashMalFix, "vout": 0, "amount": '{:.8f}'.format(Decimal(replaced_tx.vout[0].nValue/COIN)), "scriptPubKey":bytes_to_hex_str(replaced_tx.vout[0].scriptPubKey)}
-        self.log.debug("pkg_utxo: %s", replaced_tx_utxo)
         inputs = [{"txid": replaced_tx_utxo["txid"], "vout": replaced_tx_utxo["vout"], "sequence":MAX_BIP125_RBF_SEQUENCE}]
         outputs = [{self.address: replaced_tx_utxo['amount']}]
         pkg_parent = node.createrawtransaction(inputs, outputs)
         pkg_parent_tx = CTransaction()
         pkg_parent_tx.deserialize(BytesIO(hex_str_to_bytes(pkg_parent)))
         self.deduct_fee(pkg_parent_tx, 10 * mempoolmin_feerate)
-        pkg_parent_tx.rehash()
+        txid = pkg_parent_tx.rehash()
         pkg_parent = node.signrawtransactionwithwallet(pkg_parent_tx.serialize().hex(), [replaced_tx_utxo], "ALL", self.options.scheme)
         assert_equal(pkg_parent["complete"], True)
+        self.log.debug("pkg_parent: %s", txid)
 
 
         # Tx that replaces the parent of pkg_parent.
@@ -393,9 +394,10 @@ class MempoolLimitTest(BitcoinTestFramework):
         replacement_tx = CTransaction()
         replacement_tx.deserialize(BytesIO(hex_str_to_bytes(replacement_tx_hex)))
         self.deduct_fee(replacement_tx, 20 * mempoolmin_feerate)
-        replacement_tx.rehash()
+        txid = replacement_tx.rehash()
         replacement_tx_hex = node.signrawtransactionwithwallet(replacement_tx.serialize().hex(), [double_spent_utxo], "ALL", self.options.scheme)
         assert_equal(replacement_tx_hex["complete"], True)
+        self.log.debug("replacement_tx: %s", txid)
 
 
         # Create a child spending both
@@ -405,9 +407,10 @@ class MempoolLimitTest(BitcoinTestFramework):
         child.vin.append(CTxIn(COutPoint(replacement_tx.malfixsha256, 0), b"", MAX_BIP125_RBF_SEQUENCE))
         child.vout.append(CTxOut(int(pkg_parent_tx.vout[0].nValue + replacement_tx.vout[0].nValue), script))
         self.deduct_fee(child, 20 * mempoolmin_feerate)
-        child.rehash()
+        txid = child.rehash()
         child_hex = node.signrawtransactionwithwallet(child.serialize().hex(), [{'txid':pkg_parent_tx.hashMalFix, 'vout':0, 'scriptPubKey': bytes_to_hex_str(pkg_parent_tx.vout[0].scriptPubKey), 'amount':pkg_parent_tx.vout[0].nValue/COIN}, {'txid':replacement_tx.hashMalFix, 'vout':0, 'scriptPubKey': bytes_to_hex_str(replacement_tx.vout[0].scriptPubKey), 'amount':replacement_tx.vout[0].nValue/COIN}], "ALL", self.options.scheme)
         assert_equal(child_hex["complete"], True)
+        self.log.debug("child: %s", txid)
 
         # It's very important that the pkg_parent is before replacement_tx so that its input (from
         # replaced_tx) is first looked up *before* replacement_tx is submitted.
@@ -416,21 +419,22 @@ class MempoolLimitTest(BitcoinTestFramework):
         # Package should be submitted, temporarily exceeding maxmempool, and then evicted.
         self.log.info("submit package")
         res = self.submitpackage(node, package_hex)
-        #assert_equal(res[pkg_parent.hashMalFix], {'allowed': True})
-        #assert_equal(res[replacement_tx.hashMalFix], {'allowed': True})
-        #assert_equal(res[child.hashMalFix], {'allowed': True})
+
+        assert_equal(res[pkg_parent_tx.hashMalFix], {'allowed': False, 'reject-reason': 'missing-inputs'})
+        assert_equal(res[replacement_tx.hashMalFix], {'allowed': True})
+        assert_equal(res[child.hashMalFix], {'allowed': True})
 
         # Maximum size must never be exceeded.
         assert_greater_than(node.getmempoolinfo()["maxmempool"], node.getmempoolinfo()["bytes"])
 
         self.log.info("Verify package replacement")
         resulting_mempool_txids = node.getrawmempool()
-        for txid in resulting_mempool_txids:
-            self.log.debug(txid)
-        # The replacement should be successful.
-        assert replacement_tx.hashMalFix in resulting_mempool_txids
-        # The replaced tx and all of its descendants must not be in mempool.
-        assert replaced_tx.hashMalFix not in resulting_mempool_txids
+
+        # The replacement should not take place.
+        assert replaced_tx.hashMalFix in resulting_mempool_txids
+
+        # package submission failed
+        assert replacement_tx.hashMalFix not in resulting_mempool_txids
         assert pkg_parent_tx.hashMalFix not in resulting_mempool_txids
         assert child.hashMalFix not in resulting_mempool_txids
 
@@ -491,10 +495,8 @@ class MempoolLimitTest(BitcoinTestFramework):
     def run_test(self):
         self.address = key_to_p2pkh(self.signblockpubkey)
 
-        self.nodes[0].importprivkey(self.signblockprivkey_wif)
-        self.nodes[1].importprivkey(self.signblockprivkey_wif)
-        self.nodes[2].importprivkey(self.signblockprivkey_wif)
-        self.nodes[3].importprivkey(self.signblockprivkey_wif)
+        for node in self.nodes:
+            node.importprivkey(self.signblockprivkey_wif)
 
         self.log.info("Test passing a value below the minimum (5 MB) to -maxmempool throws an error")
         self.stop_node(0)
@@ -507,15 +509,15 @@ class MempoolLimitTest(BitcoinTestFramework):
 
         self.log.info("Phase 2 : Package Mempool eviction")
         self.nodes[1].generate(1, self.signblockprivkey_wif)
-        #self.test_mid_package_eviction(self.nodes[1])
+        self.test_mid_package_eviction(self.nodes[1])
 
         self.log.info("Phase 3 : Multi Package Mempool eviction")
         self.nodes[2].generate(1, self.signblockprivkey_wif)
         #self.test_multi_package_eviction(self.nodes[2])
 
         self.log.info("Phase 4 : Other Package Mempool test")
-        #self.test_package_full_mempool(self.nodes[1])
-        self.test_mid_package_replacement(self.nodes[1])
+        self.test_package_full_mempool(self.nodes[3])
+        self.test_mid_package_replacement(self.nodes[4])
 
 
 

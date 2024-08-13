@@ -91,25 +91,28 @@ bool TransformPackage(const Package& txns, CCachedPackage& cachedPackage, Packag
 
         for (const auto& spendtx : cachedPackage) {
             for (const auto& in : spendtx->vin) {
+                cachedPackage.inputs.emplace(in.prevout);
                 if (intx->GetHashMalFix() == in.prevout.hashMalFix) {
-                    allchildren.emplace(spendtx->GetHashMalFix()); // Add child transaction hash
-                    cachedPackage.inputs.emplace(in.prevout); // Ensure in is of the correct type
+                    allchildren.emplace(spendtx->GetHashMalFix());
                 }
             }
         }
 
-        // Only add to children if there are any children found
         if (!allchildren.empty()) {
             cachedPackage.children.emplace(intx->GetHashMalFix(), std::move(allchildren));
         }
-
+    }
+    for (const auto& intx : cachedPackage) {
+        
         // Log the transaction and its children
-        LogPrintf("CheckPackage: tx: %s children:\n", intx->GetHashMalFix().ToString());
-        for (const auto& x : allchildren) {
+        LogPrintf("TransformPackage: tx: %s children:\n", intx->GetHashMalFix().ToString());
+        for (const auto& x : cachedPackage.children[intx->GetHashMalFix()]) {
             LogPrintf("\t\t %s\n", x.GetHex());
         }
     }
-
+    for (const auto& x : cachedPackage.inputs) {
+        LogPrintf("inputs : %s\n", x.ToString());
+    }
     return true;
 }
 
@@ -133,9 +136,9 @@ bool CCoinsViewPackage::GetCoin(const COutPoint &outpoint, Coin &coin) const {
 
         return !coin.IsSpent();
     }
-    LogPrintf(" CCoinsViewPackage::GetCoin not in packageCoins\n");
+    LogPrintf(" CCoinsViewPackage::GetCoin not in packageCoins. check mempool\n");
 
-    return base->GetCoin(outpoint, coin);
+    return CCoinsViewMemPool::GetCoin(outpoint, coin);
 }
 
 void CCoinsViewPackage::AddCoin(const COutPoint &outpoint, Coin&& coin)
@@ -149,8 +152,6 @@ void CCoinsViewPackage::AddCoin(const COutPoint &outpoint, Coin&& coin)
 
     it->second.coin = std::move(coin);
     it->second.flags |= CCoinsCacheEntry::DIRTY | CCoinsCacheEntry::FRESH;
-
-    LogPrintf("CCoinsViewPackage::AddCoin: %s, %d, %d\n", coin.out.ToString().c_str(), coin.nHeight, coin.IsSpent());
 }
 
 void CCoinsViewPackage::AddCoins(const CTransactionRef& tx) {

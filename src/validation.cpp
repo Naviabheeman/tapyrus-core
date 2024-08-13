@@ -537,27 +537,30 @@ static bool CheckInputsFromMempoolAndCache(ValidationContext context, const CTra
     assert(!tx.IsCoinBase());
     for (const CTxIn& txin : tx.vin) {
         const Coin& coin = view.AccessCoin(txin.prevout);
-        LogPrintf("CheckInputsFromMempoolAndCache: in %s\n", txin.prevout.ToString().c_str());
-        // At this point we haven't actually checked if the coins are all
-        // available (or shouldn't assume we have, since CheckInputs does).
-        // So we just return failure if the inputs are not available here,
-        // and then only have to check equivalence for available inputs.
-        if (coin.IsSpent()) return false;
-        LogPrintf("CheckInputsFromMempoolAndCache: coin not spent\n");
-        const CTransactionRef& txFrom = pool.get(txin.prevout.hashMalFix);
-        if (txFrom) {
-            LogPrintf("CheckInputsFromMempoolAndCache: in mempool %s\n", txFrom->GetHashMalFix().ToString().c_str());
-            assert(txFrom->GetHashMalFix() == txin.prevout.hashMalFix);
-            assert(txFrom->vout.size() > txin.prevout.n);
-            assert(txFrom->vout[txin.prevout.n] == coin.out);
-        } else if(IsPackage(context)) { //transactions in a package are not expected to be present in the disk
-            const Coin& coinFromDisk = pcoinsTip->AccessCoin(txin.prevout);
-            //assert(!coinFromDisk.IsSpent());
-            //assert(coinFromDisk.out == coin.out);
-            LogPrintf("CheckInputsFromMempoolAndCache: in disk %s %d %b\n", coinFromDisk.out.ToString().c_str(), coinFromDisk.nHeight, coinFromDisk.fCoinBase);
+        if(IsPackage(context)) {
+            Coin coin;
+            view.GetCoin(txin.prevout, coin);
+            if (!coin.IsSpent()) return true;
         }
-        else
-            LogPrintf("CheckInputsFromMempoolAndCache: nowhere\n");
+        else {
+            // At this point we haven't actually checked if the coins are all
+            // available (or shouldn't assume we have, since CheckInputs does).
+            // So we just return failure if the inputs are not available here,
+            // and then only have to check equivalence for available inputs.
+            if (coin.IsSpent()) return false;
+            const CTransactionRef& txFrom = pool.get(txin.prevout.hashMalFix);
+            if (txFrom) {
+                LogPrintf("CheckInputsFromMempoolAndCache: in mempool %s\n", txFrom->GetHashMalFix().ToString().c_str());
+                assert(txFrom->GetHashMalFix() == txin.prevout.hashMalFix);
+                assert(txFrom->vout.size() > txin.prevout.n);
+                assert(txFrom->vout[txin.prevout.n] == coin.out);
+            } else if(!IsPackage(context)) { //transactions in a package are not expected to be present in the disk
+                const Coin& coinFromDisk = pcoinsTip->AccessCoin(txin.prevout);
+                assert(!coinFromDisk.IsSpent());
+                assert(coinFromDisk.out == coin.out);
+                LogPrintf("CheckInputsFromMempoolAndCache: in disk %s %d %b\n", coinFromDisk.out.ToString().c_str(), coinFromDisk.nHeight, coinFromDisk.fCoinBase);
+            }
+        }
     }
 
     TxColoredCoinBalancesMap inColoredCoinBalances;
@@ -1017,10 +1020,12 @@ static bool AcceptToMemoryPoolWorker(const CTransactionRef &ptx, CTxMempoolAccep
                 // transactions that would have to be evicted
                 for (CTxMemPool::txiter it : setIterConflicting) {
                     pool.CalculateDescendants(it, allConflicting);
+                    LogPrintf("AcceptToMemoryPool:CalculateDescendants %d \n", allConflicting.size());
 
                     if(IsPackage(opt.context)){
                         const CCachedPackage pkg = std::get<const CCachedPackage>(opt.context);
                         pkg.CalculatePackageDescendants(it->GetTx().GetHashMalFix(), allConflictingPackage);
+                        LogPrintf("AcceptToMemoryPool:CalculatePackageDescendants %d \n", allConflictingPackage.size());
                     }
                 }
                 for (CTxMemPool::txiter it : allConflicting) {
@@ -1029,9 +1034,11 @@ static bool AcceptToMemoryPoolWorker(const CTransactionRef &ptx, CTxMempoolAccep
                     LogPrintf("AcceptToMemoryPool:from allConflicting nConflictingFees: %d nConflictingSize: %d \n", nConflictingFees, nConflictingSize);
                 }
                 for (auto &it : allConflictingPackage) {
-                    auto mempooliter = mempool.info(hash);
-                    nConflictingFees += mempooliter.feeRate.GetFee(mempooliter.tx->GetTotalSize());
-                    nConflictingSize += mempooliter.tx->GetTotalSize();
+                    auto mempooliter = mempool.get(it);
+
+                    LogPrintf("AcceptToMemoryPool:allConflictingPackage mempooliter %s\n", mempooliter->GetHashMalFix().ToString());
+                    nConflictingFees += mempooliter->GetTotalSize();
+                    nConflictingSize += mempooliter->GetTotalSize();
                     LogPrintf("AcceptToMemoryPool:from allConflictingPackage nConflictingFees: %d nConflictingSize: %d \n", nConflictingFees, nConflictingSize);
                 }
 
