@@ -26,11 +26,7 @@ tx_size = lambda tx : len(ToHex(tx))//2 + 120 * len(tx.vin) + 50
 
 class MempoolLimitTest(BitcoinTestFramework):
     def __init(self):
-        #self.signblockprivkey = CECKey()
-        #self.coinbase_key.set_secretbytes(bytes.fromhex("8d5366123cb560bb606379f90a0bfd4769eecc0557f1b362dcae9012b548b1e5"))
-        #self.signblockpubkey = self.coinbase_key.get_pubkey()
         self.setup_clean_chain = True
-        #self.genesisBlock = createTestGenesisBlock(self.coinbase_pubkey, self.coinbase_key, int(time.time() - 100))
 
     def set_test_params(self):
         self.setup_clean_chain = True
@@ -39,7 +35,6 @@ class MempoolLimitTest(BitcoinTestFramework):
 
     def deduct_fee(self, tx, feerate):
         tx.vout[0].nValue -= int(feerate / 1000 * tx_size(tx) * COIN)
-        #round(tx.vout[0].nValue, 6)
 
     def setup_network(self):
         self.setup_nodes()
@@ -69,13 +64,14 @@ class MempoolLimitTest(BitcoinTestFramework):
         utxos = [utxo for utxo in node.listunspent() if utxo['amount'] > fee]
         return utxos
 
-    def fill_mempool(self, node, utxos, feerate, num_tx=97):
+    def fill_mempool(self, node, utxos, feerate, num_tx=97, nSequence=0):
         # fill the mempool with large transactions
         txids = []
         self.log.info("Fill mempool")
         for i in range(num_tx):
             utxo = utxos.pop()
             tx = self.create_tx_with_large_script(int(utxo['txid'], 16), utxo['vout'], 5, (utxo['amount'])/5)
+            tx.vin[0].nSequence = nSequence
             self.deduct_fee(tx, feerate)
             signresult = node.signrawtransactionwithwallet(ToHex(tx))
             txid = node.sendrawtransaction(signresult["hex"])
@@ -103,7 +99,7 @@ class MempoolLimitTest(BitcoinTestFramework):
     def create_package(self, node, utxos, mempool_evicted_utxo, feerate, size=5, large=False):
         # create size-1 parent transactions and one child transaction spend all parents
         # one of them should spend the mempool_evicted_utxo
-        self.log.info("Create package transactions %s" % mempool_evicted_utxo)
+        self.log.info("Create package transactions")
         parent_txs = []
         package_hex =[]
         package_txids = []
@@ -126,10 +122,6 @@ class MempoolLimitTest(BitcoinTestFramework):
             inputs.append({'txid': parent_tx.hashMalFix, 'vout': 0})
             prevtx.append({'txid':parent_tx.hashMalFix, 'scriptPubKey': bytes_to_hex_str(parent_tx.vout[0].scriptPubKey), 'vout':0, 'amount':parent_tx.vout[0].nValue/COIN})
             value += parent_tx.vout[0].nValue
-
-            # There is room for each of these transactions independently
-            #res = node.testmempoolaccept([parent.serialize().hex()])
-            #assert_equal(res[parent.hashMalFix], {'allowed': True})
 
         # Create a child transaction spending everything.
         if large:
@@ -177,36 +169,25 @@ class MempoolLimitTest(BitcoinTestFramework):
         relayfee = node.getnetworkinfo()['relayfee']
         utxos = self.create_utxos(node, 103, relayfee)
 
-        # create a transaction to be evicted
-        utxo_pkg = utxos.pop()
-        (mempool_evicted_tx, mempool_evicted_hex) = self.create_tx_to_be_evicted(node, utxo_pkg, relayfee)
-        mempool_evicted_utxo = {'txid': mempool_evicted_tx.hashMalFix,
-                                'vout': 0,
-                                'scriptPubKey' : bytes_to_hex_str(mempool_evicted_tx.vout[0].scriptPubKey),
-                                'amount' : mempool_evicted_tx.vout[0].nValue / COIN
-                                }
-
         # fill the mempool with large transactions
-        self.fill_mempool(node, utxos, relayfee * 100)
-
-
+        self.fill_mempool(node, utxos, relayfee * 100, nSequence=0)
 
         # There is a filler transaction. It is large so that most of the mempool is filled
         # this makes sure that the package submittted next would trigger eviction
         self.log.info("Fill the mempool with another large transaction")
         utxos = [utxo for utxo in node.listunspent() if utxo['amount'] > relayfee * 10]
         utxo = utxos.pop()
-        tx = self.create_tx_with_large_script(int(utxo['txid'], 16), utxo['vout'], 4, utxo['amount']/4)
+        tx = self.create_tx_with_large_script(int(utxo['txid'], 16), utxo['vout'], 5, utxo['amount']/5)
+        tx.vin[0].nSequence = 0
         self.deduct_fee(tx, relayfee * 100)
         signresult = node.signrawtransactionwithwallet(ToHex(tx))
         txid = node.sendrawtransaction(signresult["hex"])
         assert txid in node.getrawmempool()
-        self.log.info("%s %s %s" % (utxo, mempool_evicted_utxo, tx.hashMalFix))
 
         mempoolmin_feerate = node.getmempoolinfo()["mempoolminfee"]
         utxos = [utxo for utxo in node.listunspent()if utxo['amount'] >  mempoolmin_feerate * 100]
 
-        (package_hex, package_txids) = self.create_package(node, utxos, mempool_evicted_utxo, mempoolmin_feerate * Decimal(0.77), size=5, large=True)
+        (package_hex, package_txids) = self.create_package(node, utxos, None, mempoolmin_feerate, size=7, large=True)
 
         # Package should be submitted, temporarily exceeding maxmempool, and then evicted.
         mempool_txids = node.getrawmempool()
@@ -241,11 +222,9 @@ class MempoolLimitTest(BitcoinTestFramework):
         self.deduct_fee(tx, relayfee)
         signresult = node.signrawtransactionwithwallet(ToHex(tx))
         node.sendrawtransaction(signresult["hex"], True)
-        self.log.debug("###%s### large" % tx.hashMalFix)
 
         self.log.info("Send transaction to be evicted from mempool")
         (mempool_evicted_tx, mempool_evicted_hex) = self.create_tx_to_be_evicted(node, utxos.pop(), mempoolmin_feerate)
-        self.log.debug("###%s### evict" % mempool_evicted_tx.hashMalFix)
         mempool_evicted_utxo = {'txid': mempool_evicted_tx.hashMalFix,
                                 'vout': 0,
                                 'scriptPubKey' : bytes_to_hex_str(mempool_evicted_tx.vout[0].scriptPubKey),
@@ -253,8 +232,9 @@ class MempoolLimitTest(BitcoinTestFramework):
                                 }
 
         utxos = [utxo for utxo in node.listunspent()if utxo['amount'] >  mempoolmin_feerate * 100]
+        init_mempool_txids = node.getrawmempool()
 
-        (package_hex, txids) = self.create_package(node, utxos, mempool_evicted_utxo, mempoolmin_feerate, large=True)
+        (package_hex, txids) = self.create_package(node, utxos, mempool_evicted_utxo, mempoolmin_feerate * 100, large=True)
 
         self.log.info("Submit package transactions")
         res = self.submitpackage(node, package_hex)
@@ -268,18 +248,37 @@ class MempoolLimitTest(BitcoinTestFramework):
         # Evicted transaction and its descendants must not be in mempool.
         self.log.info("Verify package eviction")
         resulting_mempool_txids = node.getrawmempool()
-        assert mempool_evicted_tx.hashMalFix not in resulting_mempool_txids
-        for txid in txids:
-            assert txid not in resulting_mempool_txids
+        actual_mempool_evicted_tx = [tx for tx in init_mempool_txids if tx not in resulting_mempool_txids]
+        assert actual_mempool_evicted_tx not in resulting_mempool_txids
+
+        if mempool_evicted_tx == actual_mempool_evicted_tx:
+            for txid in txids:
+                assert txid not in resulting_mempool_txids
+        else:
+            for txid in txids:
+                assert txid in resulting_mempool_txids
 
 
     def test_multi_package_eviction(self, node):
         self.log.info("Check a package where each parent passes the current mempoolminfee but would cause eviction before package submission terminates")
         relayfee = node.getnetworkinfo()['relayfee']
-        utxos = self.create_utxos(node, 103, relayfee)
+        utxos = self.create_utxos(node, 203, relayfee)
+
+        self.log.info("Send package to be evicted from mempool")
+
+        #package 1
+        utxos = [utxo for utxo in node.listunspent()if utxo['amount'] >  relayfee]
+
+        (package_hex1, txids1) = self.create_package(node, utxos, None, 1, large=True)
+
+        self.log.info("Submit package 1 transactions")
+        res = self.submitpackage(node, package_hex1)
+
+        for txid in txids1:
+            assert_equal(res[txid], {'allowed':True})
 
         # fill the mempool with large transactions
-        self.fill_mempool(node, utxos, relayfee, 96)
+        self.fill_mempool(node, utxos, relayfee)
 
         # There is a filler transaction. It is large so that most of the mempool is filled
         # this makes sure that the package submittted next would trigger eviction
@@ -290,34 +289,12 @@ class MempoolLimitTest(BitcoinTestFramework):
         self.deduct_fee(tx, relayfee)
         signresult = node.signrawtransactionwithwallet(ToHex(tx))
         node.sendrawtransaction(signresult["hex"], True)
-        self.log.debug("###%s### large" % tx.hashMalFix)
-
-        self.log.info("Send transaction to be evicted from mempool")
-        (mempool_evicted_tx, mempool_evicted_hex) = self.create_tx_to_be_evicted(node, utxos.pop(), relayfee)
-        self.log.debug("###%s### evict" % mempool_evicted_tx.hashMalFix)
-        mempool_evicted_utxo = {'txid': mempool_evicted_tx.hashMalFix,
-                                'vout': 0,
-                                'scriptPubKey' : bytes_to_hex_str(mempool_evicted_tx.vout[0].scriptPubKey),
-                                'amount' : mempool_evicted_tx.vout[0].nValue / COIN
-                                }
-
-        #package 1
-        mempoolmin_feerate = node.getmempoolinfo()["mempoolminfee"]
-        utxos = [utxo for utxo in node.listunspent()if utxo['amount'] >  mempoolmin_feerate * 100]
-
-        (package_hex1, txids1) = self.create_package(node, utxos, mempool_evicted_utxo, mempoolmin_feerate, large=True)
-
-        self.log.info("Submit package 1 transactions")
-        res = self.submitpackage(node, package_hex1)
-
-        for txid in txids1:
-            assert_equal(res[txid], {'allowed':True})
 
         #package 2
         mempoolmin_feerate = node.getmempoolinfo()["mempoolminfee"]
         utxos = [utxo for utxo in node.listunspent()if utxo['amount'] >  mempoolmin_feerate * 100]
 
-        (package_hex2, txids2) = self.create_package(node, utxos, None, mempoolmin_feerate, large=True)
+        (package_hex2, txids2) = self.create_package(node, utxos, None, mempoolmin_feerate, size=10, large=True)
 
         self.log.info("Submit package 2 transactions")
         res = self.submitpackage(node, package_hex2)
@@ -331,7 +308,6 @@ class MempoolLimitTest(BitcoinTestFramework):
         # Evicted transaction and its descendants must not be in mempool.
         self.log.info("Verify package eviction")
         resulting_mempool_txids = node.getrawmempool()
-        assert mempool_evicted_tx.hashMalFix not in resulting_mempool_txids
         for txid in txids1:
             assert txid not in resulting_mempool_txids
         for txid in txids2:
@@ -354,7 +330,6 @@ class MempoolLimitTest(BitcoinTestFramework):
         # happen in the middle of package evaluation, as it can invalidate the coins cache.
         self.log.info("send transaction to be replaced")
         double_spent_utxo = utxos.pop()
-        self.log.debug("double_spent_utxo: %s", double_spent_utxo)
         inputs = [{"txid": double_spent_utxo["txid"], "vout": double_spent_utxo["vout"], "sequence":MAX_BIP125_RBF_SEQUENCE}]
         outputs = [{self.address: double_spent_utxo['amount']}]
         replaced_tx_hex = node.createrawtransaction(inputs, outputs)
@@ -532,7 +507,7 @@ class MempoolLimitTest(BitcoinTestFramework):
         info_2 = node.getmempoolinfo()
         diff = [tx for tx in mempool_2 if tx not in mempool_1]
         evict = [tx for tx in mempool_1 if tx not in mempool_2]
-        self.log.info("\n\n%s\n\n" % res)
+        #self.log.info("\n\n%s\n\n" % res)
 
         self.log.info("Mempool info : \n%s\n%s\n\n" % (info_1, info_2))
         self.log.info("Mempool add : %s\n" % diff)

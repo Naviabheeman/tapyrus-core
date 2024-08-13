@@ -292,6 +292,13 @@ BOOST_FIXTURE_TEST_CASE(package_validation_tests, PackageTestSetup)
         BOOST_CHECK_EQUAL(validationState[mtx_child.GetHashMalFix()].GetRejectReason(), "txn-already-in-mempool");
 
         BOOST_CHECK_EQUAL(mempool.size(), initialPoolSize + 2);
+
+        //check cached package
+        CCachedPackage cachedPkg;
+        BOOST_CHECK(TransformPackage(package_parent_child, cachedPkg, validationState));
+        BOOST_CHECK_EQUAL(cachedPkg.inputs.size(), 0);
+        BOOST_CHECK_EQUAL(cachedPkg.children[mtx_parent.GetHashMalFix()].size(), 0);
+        BOOST_CHECK_EQUAL(cachedPkg.children[mtx_child.GetHashMalFix()].size(), 0);
     }
 
     // Parent and Child Package
@@ -326,6 +333,13 @@ BOOST_FIXTURE_TEST_CASE(package_validation_tests, PackageTestSetup)
 
         // Check that mempool size hasn't changed.
         BOOST_CHECK_EQUAL(mempool.size(), initialPoolSize + 2);
+
+        //check cached package
+        CCachedPackage cachedPkg;
+        BOOST_CHECK(TransformPackage(package_parent_child, cachedPkg, validationState));
+        BOOST_CHECK_EQUAL(cachedPkg.inputs.size(), 2);
+        BOOST_CHECK_EQUAL(cachedPkg.children[mtx_parent.GetHashMalFix()].size(), 1);
+        BOOST_CHECK_EQUAL(cachedPkg.children[mtx_child.GetHashMalFix()].size(), 0);
     }
 
     // Parent in mempool
@@ -359,6 +373,13 @@ BOOST_FIXTURE_TEST_CASE(package_validation_tests, PackageTestSetup)
 
         // Check that mempool size hasn't changed.
         BOOST_CHECK_EQUAL(mempool.size(), initialPoolSize + 3);
+
+        //check cached package
+        CCachedPackage cachedPkg;
+        BOOST_CHECK(TransformPackage(package_parent_child, cachedPkg, validationState));
+        BOOST_CHECK_EQUAL(cachedPkg.inputs.size(), 1);
+        BOOST_CHECK_EQUAL(cachedPkg.children[mtx_parent.GetHashMalFix()].size(), 0);
+        BOOST_CHECK_EQUAL(cachedPkg.children[mtx_child.GetHashMalFix()].size(), 0);
     }
 }
 BOOST_FIXTURE_TEST_CASE(package_orphan_tx_tests, PackageTestSetup)
@@ -430,6 +451,13 @@ BOOST_FIXTURE_TEST_CASE(package_orphan_tx_tests, PackageTestSetup)
 
         // Check that mempool size hasn't changed.
         BOOST_CHECK_EQUAL(mempool.size(), initialPoolSize);
+
+        //check cached package
+        CCachedPackage cachedPkg;
+        BOOST_CHECK(TransformPackage(package_parent_child, cachedPkg, validationState));
+        BOOST_CHECK_EQUAL(cachedPkg.inputs.size(), 2);
+        BOOST_CHECK_EQUAL(cachedPkg.children[mtx_orphan.GetHashMalFix()].size(), 1);
+        BOOST_CHECK_EQUAL(cachedPkg.children[mtx_gchild.GetHashMalFix()].size(), 0);
     }
 
     // Child in orphan pool
@@ -486,6 +514,14 @@ BOOST_FIXTURE_TEST_CASE(package_orphan_tx_tests, PackageTestSetup)
 
         // Check that mempool size hasn't changed.
         BOOST_CHECK_EQUAL(mempool.size(), initialPoolSize);
+
+        //check cached package
+        CCachedPackage cachedPkg;
+        BOOST_CHECK(TransformPackage(package_parent_child, cachedPkg, validationState));
+        BOOST_CHECK_EQUAL(cachedPkg.inputs.size(), 3);
+        BOOST_CHECK_EQUAL(cachedPkg.children[mtx_parent.GetHashMalFix()].size(), 1);
+        BOOST_CHECK_EQUAL(cachedPkg.children[mtx_child.GetHashMalFix()].size(), 1);
+        BOOST_CHECK_EQUAL(cachedPkg.children[mtx_orphan.GetHashMalFix()].size(), 0);
     }
 }
 
@@ -570,6 +606,11 @@ BOOST_FIXTURE_TEST_CASE(noncontextual_package_tests, PackageTestSetup)
         BOOST_CHECK(CheckPackage(package, state));
         BOOST_CHECK_EQUAL(state.GetRejectCode(), 0);
         BOOST_CHECK_EQUAL(state.GetRejectReason(), "");
+
+        //check cached package
+        CCachedPackage cachedPkg;
+        BOOST_CHECK(TransformPackage(package, cachedPkg, results));
+        BOOST_CHECK_EQUAL(cachedPkg.inputs.size(), 48);
     }
 
     // 2 Parents and 1 Child where one parent depends on the other.
@@ -599,6 +640,15 @@ BOOST_FIXTURE_TEST_CASE(noncontextual_package_tests, PackageTestSetup)
         BOOST_CHECK(!CheckPackage({tx_parent_also_child, tx_parent, tx_child}, state));
         BOOST_CHECK_EQUAL(state.GetRejectCode(), REJECT_PACKAGE_INVALID);
         BOOST_CHECK_EQUAL(state.GetRejectReason(), "package-not-sorted");
+
+        //check cached package
+        CCachedPackage cachedPkg;
+        BOOST_CHECK(TransformPackage({tx_parent, tx_parent_also_child}, cachedPkg, results));
+        BOOST_CHECK_EQUAL(cachedPkg.inputs.size(), 2);
+        BOOST_CHECK(TransformPackage({tx_parent, tx_child}, cachedPkg, results));
+        BOOST_CHECK_EQUAL(cachedPkg.inputs.size(), 4);
+        BOOST_CHECK(TransformPackage({tx_parent, tx_parent_also_child, tx_child}, cachedPkg, results));
+        BOOST_CHECK_EQUAL(cachedPkg.inputs.size(), 4);
     }
     BOOST_CHECK_EQUAL(mempool.size(), initialPoolSize + 2);
 }
@@ -674,7 +724,6 @@ BOOST_FIXTURE_TEST_CASE(package_submission_tests, PackageTestSetup)
     CScript child_locking_script = GetScriptForDestination(child_key.GetPubKey().GetID());
     COutPoint spend_parent(tx_parent->GetHashMalFix(), 0);
     CMutableTransaction mtx_child = CreateValidTransaction(spend_parent, CAmount(40 * COIN), {CScript() << OP_TRUE << OP_EQUAL});
-    //Sign(vchSig, parent_key, tx_parent->vout[0].scriptPubKey, 0, mtx_child, 0);
     mtx_child.vin[0].scriptSig = CScript() << OP_TRUE;
     for(auto x = 0; x < 3; x++)
         mtx_child.vout.push_back(CTxOut(CAmount(1 * COIN), {CScript() << OP_TRUE << OP_EQUAL}));
@@ -684,7 +733,6 @@ BOOST_FIXTURE_TEST_CASE(package_submission_tests, PackageTestSetup)
 
     COutPoint spend_child(tx_child->GetHashMalFix(), 0);
     CMutableTransaction mtx_grandchild = CreateValidTransaction(spend_child, CAmount(20 * COIN), {CScript() << OP_TRUE << OP_EQUAL});
-    //Sign(vchSig, child_key, tx_child->vout[0].scriptPubKey, 0, mtx_grandchild, 0);
     mtx_grandchild.vin[0].scriptSig = CScript() << OP_TRUE;
     for(auto x = 0; x < 3; x++)
         mtx_grandchild.vout.push_back(CTxOut(CAmount(1 * COIN), {CScript() << OP_TRUE << OP_EQUAL}));
