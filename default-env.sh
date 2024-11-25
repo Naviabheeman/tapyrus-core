@@ -13,3 +13,4 @@ export BASE_OUTDIR=$GITHUB_WORKSPACE/out
 export SDK_URL=https://bitcoincore.org/depends-sources/sdks
 export WINEDEBUG=fixme-all
 export BUILD_PACKAGES="build-essential libtool autotools-dev automake pkg-config bsdmainutils curl git ca-certificates ccache bison"
+export WITH_GUI=no

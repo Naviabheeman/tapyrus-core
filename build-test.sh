@@ -25,7 +25,7 @@ BITCOIN_CONFIG_ALL="--disable-dependency-tracking --prefix=${GITHUB_WORKSPACE}/d
 if [ -z "$NO_DEPENDS" ]; then ccache --max-size=$CCACHE_SIZE; fi
 test -n "$CONFIG_SHELL" && bash -c "$CONFIG_SHELL" -c "./autogen.sh" || ./autogen.sh
 mkdir build && cd build
-../configure --cache-file=config.cache $BITCOIN_CONFIG_ALL $BITCOIN_CONFIG || ( cat config.log && false)
+../configure --with-gui=$WITH_GUI --cache-file=config.cache $BITCOIN_CONFIG_ALL $BITCOIN_CONFIG || ( cat config.log && false)
 make distdir VERSION=$HOST
 cd tapyrus-core-$HOST
 ./configure --cache-file=../config.cache $BITCOIN_CONFIG_ALL $BITCOIN_CONFIG || ( cat config.log && false)

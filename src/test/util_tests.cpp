@@ -1117,7 +1117,7 @@ static void TestOtherProcess(fs::path dirname, std::string lockname, int fd)
             break;
         case UnlockCommand:
             ReleaseDirectoryLocks();
-            ch = true; // Always succeeds
+            ch = ResUnlockSuccess; // Always succeeds
             rv = write(fd, &ch, 1);
             assert(rv == 1);
             break;
@@ -1177,7 +1177,7 @@ BOOST_AUTO_TEST_CASE(test_LockDirectory)
     char ch;
     BOOST_CHECK_EQUAL(write(fd[1], &LockCommand, 1), 1);
     BOOST_CHECK_EQUAL(read(fd[1], &ch, 1), 1);
-    BOOST_CHECK_EQUAL((bool)ch, ResUnlockSuccess);
+    BOOST_CHECK_EQUAL(ch, ResErrorLock);
 
     // Give up our lock
     ReleaseDirectoryLocks();
@@ -1187,7 +1187,7 @@ BOOST_AUTO_TEST_CASE(test_LockDirectory)
     // Try to acquire the lock in the child process, this should be successful.
     BOOST_CHECK_EQUAL(write(fd[1], &LockCommand, 1), 1);
     BOOST_CHECK_EQUAL(read(fd[1], &ch, 1), 1);
-    BOOST_CHECK_EQUAL((bool)ch, true);
+    BOOST_CHECK_EQUAL(ch, ResSuccess);
 
     // When we try to probe the lock now, it should fail.
     BOOST_CHECK_EQUAL(LockDirectory(dirname, lockname, true), LockResult::ErrorLock);
@@ -1195,7 +1195,7 @@ BOOST_AUTO_TEST_CASE(test_LockDirectory)
     // Unlock the lock in the child process
     BOOST_CHECK_EQUAL(write(fd[1], &UnlockCommand, 1), 1);
     BOOST_CHECK_EQUAL(read(fd[1], &ch, 1), 1);
-    BOOST_CHECK_EQUAL((bool)ch, true);
+    BOOST_CHECK_EQUAL(ch, ResUnlockSuccess);
 
     // When we try to probe the lock now, it should succeed.
     BOOST_CHECK_EQUAL(LockDirectory(dirname, lockname, true), LockResult::Success);
