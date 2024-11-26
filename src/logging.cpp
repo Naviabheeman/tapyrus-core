@@ -37,7 +37,8 @@ bool BCLog::Logger::OpenDebugLog()
     assert(m_fileout == nullptr);
     assert(!m_file_path.empty());
 
-    m_fileout = fsbridge::fopen(m_file_path, "a");
+    char mode = fs::exists(m_file_path) && fs::is_regular_file(m_file_path) ? 'a' : 'w';
+    m_fileout = fsbridge::fopen(m_file_path, &mode);
     if (!m_fileout) {
         return false;
     }

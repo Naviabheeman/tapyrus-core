@@ -1217,7 +1217,10 @@ int64_t GetStartupTime()
 
 fs::path AbsPathForConfigVal(const fs::path& in_path, bool net_specific)
 {
-    return fs::absolute(GetDataDir(net_specific) / fs::path(in_path));
+    if (in_path.is_absolute()) {
+        return in_path;
+    }
+    return fs::absolute(( GetDataDir(net_specific) / in_path));
 }
 
 int ScheduleBatchPriority(void)
