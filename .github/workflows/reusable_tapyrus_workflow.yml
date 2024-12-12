@@ -1,0 +1,73 @@
+name: Reusable Tapyrus Core Build
+
+on:
+  workflow_call:
+    inputs:
+      build_env:
+        required: true
+        type: string
+      build_config:
+        required: true
+        type: string
+      os_packages:
+        required: true
+        type: string
+      depends_build:
+        required: true
+        type: string
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Set Up Dependencies
+        run: |
+          ${{ inputs.os_packages }}
+
+      - name: Build Dependencies
+        run: |
+          eval ${{ inputs.depends_build }}
+
+      - name: Configure Tapyrus Core
+        env:
+          CCACHE_DIR: /tmp/ccache
+          PATH: /usr/local/bin:$PATH
+          ARCH: ${{ inputs.build_env }}  # Passing environment variables directly
+        run: |
+          ./autogen.sh
+          eval "./configure ${{ inputs.build_config }}"
+
+      - name: Build Tapyrus Core
+        env:
+          CCACHE_DIR: /tmp/ccache
+          PATH: /usr/local/bin:$PATH
+          ARCH: ${{ inputs.build_env }}  # Passing environment variables directly
+        run: |
+          make
+
+      - name: Run Tests
+        env:
+          CCACHE_DIR: /tmp/ccache
+          PATH: /usr/local/bin:$PATH
+          ARCH: ${{ inputs.build_env }}  # Passing environment variables directly
+        run: |
+          make check
+
+      - name: Run Functional Tests
+        env:
+          CCACHE_DIR: /tmp/ccache
+          PATH: /usr/local/bin:$PATH
+          ARCH: ${{ inputs.build_env }}  # Passing environment variables directly
+        run: |
+          test/functional/test_runner.py
+
+      - name: Extract Core Dumps
+        if: failure()
+        run: |
+          sudo sysctl -w kernel.core_pattern=core.%e.%p.%t
+          sudo coredumpctl info
+          sudo coredumpctl dump > core_dump.log
