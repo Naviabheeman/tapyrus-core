@@ -16,14 +16,36 @@ env:
   CI_BASE_OUTDIR: ${{ github.workspace }}/out
   CI_SDK_URL: https://bitcoincore.org/depends-sources/sdks
   CI_WINEDEBUG: fixme-all
-  CI_BUILD_PACKAGES: build-essential libtool autotools-dev automake pkg-config bsdmainutils curl git ca-certificates ccache bison
+  CI_BUILD_PACKAGES: build-essential clang libtool autotools-dev automake pkg-config bsdmainutils curl git ca-certificates ccache bison
   CI_DEPENDS_OPTS: ''
   LINUX_PACKAGES: "python3-zmq libevent-dev bsdmainutils libboost-filesystem-dev libboost-test-dev libdb5.3++-dev libminiupnpc-dev libzmq3-dev libqrencode-dev systemtap-sdt-dev bpfcc-tools bpftrace"
-  MACOS_PACKAGES: "cmake imagemagick libcap-dev librsvg2-bin libz-dev libbz2-dev libtiff-tools python3-dev python3-setuptools xorriso libtinfo5"
+  DARWIN_CROSS_PACKAGES: "cmake imagemagick libcap-dev librsvg2-bin libz-dev libbz2-dev libtiff-tools python3-dev python3-setuptools xorriso libtinfo5"
+  DARWIN_NATIVE_PACKAGES: "automake libtool pkg-config gnu-getopt ccache boost libevent miniupnpc libnatpmp zeromq qt@5 qrencode"
   WIN_PACKAGES: "python3 nsis g++-mingw-w64-x86-64 wine-binfmt wine64"
   LINUX_CONFIG: "--enable-zmq --with-incompatible-bdb --enable-reduce-exports --enable-usdt CPPFLAGS=-DDEBUG_LOCKORDER"
-  MACOS_CONFIG: ""
+  DARWIN_CONFIG: ""
   WIN_CONFIG: "--enable-reduce-exports"
+  CI_DEBUG_CONFIG: "--enable-debug"
+  CI_CONFIG_OS_OPT: ""
+  CI_PACKAGES: ""
+
+  # Environment variable groups for different OS
+env_groups:
+  linux:
+    CI_PACKAGES: "python3-zmq libevent-dev bsdmainutils libboost-filesystem-dev libboost-test-dev libdb5.3++-dev libminiupnpc-dev libzmq3-dev libqrencode-dev systemtap-sdt-dev bpfcc-tools bpftrace"
+    CI_CONFIG_OS_OPT: "--enable-zmq --with-incompatible-bdb --enable-reduce-exports --enable-usdt CPPFLAGS=-DDEBUG_LOCKORDER"
+    DARWIN_CROSS_PACKAGES: "cmake imagemagick libcap-dev librsvg2-bin libz-dev libbz2-dev libtiff-tools python3-dev python3-setuptools xorriso libtinfo5"
+
+  darwin:
+    CI_PACKAGES: "automake libtool pkg-config gnu-getopt ccache boost libevent miniupnpc libnatpmp zeromq qt@5 qrencode"
+    CI_CONFIG_OS_OPT: ""
+    CI_GOAL: "all deploy"
+
+  windows:
+    CI_PACKAGES: "python3 nsis g++-mingw-w64-x86-64 wine-binfmt wine64"
+    CI_CONFIG_OS_OPT: "--enable-reduce-exports"
+    CI_RUN_TESTS: false
+    CI_RUN_BENCH: false
 
 jobs:
   lint:
@@ -47,12 +69,12 @@ jobs:
           echo "PENDING some lint files! pending lint file name has 'pending-' prefix."
           ls test/lint/ | grep ^pending-
 
-  build:
-    name: Build and Test
+  build-linux:
+    name: ${{ matrix.target_os }}-${{ matrix.architecture }}-${{ matrix.compiler }}-debug_${{ matrix.debug }}-gui_${{ matrix.gui }}-wallet_${{ matrix.wallet }}
     runs-on: ubuntu-22.04
     strategy:
       matrix:
-        target_os: [linux, macos, windows]
+        target_os: [linux, darwin, windows]
         architecture: [x86_64, arm64]
         compiler: [gcc, clang]
         debug: [true, false]
@@ -61,33 +83,19 @@ jobs:
         include:
           - target_os: linux
             compiler: gcc
-          #- target_os: linux
-          #  compiler: clang
           - target_os: linux
-            compiler: gcc
-          #- target_os: linux
-          #  compiler: clang
+            compiler: clang
         exclude:
-          #- target_os: macos
-          #- target_os: windows
           - gui: qt5
           - wallet: no
           - architecture: arm64
-          - target_os: macos
           - target_os: windows
+          - compiler: clang
 
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
-
-      - name: Print Matrix Configuration
-        run: |
-          echo "Target OS: ${{ matrix.target_os }}"
-          echo "Architecture: ${{ matrix.architecture }}"
-          echo "Compiler: ${{ matrix.compiler }}"
-          echo "Debug Mode: ${{ matrix.debug }}"
-          echo "GUI: ${{ matrix.gui }}"
 
       - name: Configure Retry Function and Update PATH
         run: |
@@ -96,46 +104,41 @@ jobs:
 
       - name: Export Environment Variables
         run: |
-          env | grep -E '^(CI_|STEP_|CCACHE_|WINEDEBUG|LC_ALL|BOOST_TEST_RANDOM|CONFIG|PACKAGES)' | tee /tmp/env
+          export NAME_OF_CONFIG="${{ matrix.target_os }}-${{ matrix.architecture }}-${{ matrix.compiler }}-debug_${{ matrix.debug }}-gui_${{ matrix.gui }}"
+          echo "Running $NAME_OF_CONFIG"
           if [ "${{ matrix.target_os }}" == "windows" ]; then
-            export PACKAGES="env.WIN_PACKAGES"
-            export CO=ms
-            export CONFIG_OS_OPT="$env.WIN_CONFIG"
-            export CI_RUN_TESTS=false
-            export CI_RUN_BENCH=false
-          elif [ "${{ matrix.target_os }}" == "macos" ]; then
-            export PACKAGES="env.MACOS_PACKAGES"
-            export CO=apple
-            export CONFIG_OS_OPT="$env.MACOS_CONFIG"
-            export CI_GOAL="all deploy"
-            export CI_RUN_TESTS=false
-            export CI_RUN_BENCH=false
-          else
-            export PACKAGES="env.LINUX_PACKAGES"
-            export CO=unknown
-            export CONFIG_OS_OPT="$env.LINUX_CONFIG"
+            echo CI_PACKAGES="$WIN_PACKAGES" >> $GITHUB_ENV
+            echo CI_CONFIG_OS_OPT="$WIN_CONFIG" >> $GITHUB_ENV
+            echo CI_RUN_TESTS=false >> $GITHUB_ENV
+            echo CI_RUN_BENCH=false >> $GITHUB_ENV
+          elif [ "${{ matrix.target_os }}" == "darwin" ]; then
+            echo CI_PACKAGES="$DARWIN_CROSS_PACKAGES" >> $GITHUB_ENV
+            echo CI_CONFIG_OS_OPT="$env.DARWIN_CONFIG" >> $GITHUB_ENV
+            echo CI_GOAL="all deploy" >> $GITHUB_ENV
+            echo CI_RUN_TESTS=false >> $GITHUB_ENV
+            echo CI_RUN_BENCH=false >> $GITHUB_ENV
+          elif [ "${{ matrix.target_os }}" == "linux" ]; then
+            echo CI_PACKAGES="$LINUX_PACKAGES" >> $GITHUB_ENV
+            echo CI_CONFIG_OS_OPT="$LINUX_CONFIG" >> $GITHUB_ENV
           fi
           if [ "${{ matrix.compiler }}" == "gcc" ]; then
-            export CC=gcc
-            export CXX=g++
+            echo CC=gcc >> $GITHUB_ENV
+            echo CXX=g++ >> $GITHUB_ENV
           elif [ "${{ matrix.compiler }}" == "clang" ]; then
-            export CC=clang
-            export CXX=clang++
+            echo CC=clang >> $GITHUB_ENV
+            echo CXX=clang++ >> $GITHUB_ENV
           fi
           if [ "${{ matrix.debug }}" == "true" ]; then
-            export BUILD_TYPE="Debug"
-            export DEBUG_FLAGS="-g -O0 -DDEBUG"
-          else
-            export BUILD_TYPE="Release"
-            export DEBUG_FLAGS="-O2"
+            echo DEBUG_FLAGS="${{ env.CI_DEBUG_CONFIG }} CPPFLAGS=-DDEBUG" >> $GITHUB_ENV
           fi
           if [ "${{ matrix.wallet }}" == "no" ]; then
-            export CI_DEPENDS_OPTS="NO_WALLET=1"
+            echo CI_DEPENDS_OPTS="NO_WALLET=1" >> $GITHUB_ENV
           fi
           if [ "${{ matrix.gui }}" == "no" ]; then
-            export CI_DEPENDS_OPTS="NO_QT=1"
+            echo CI_DEPENDS_OPTS="NO_QT=1" >> $GITHUB_ENV
           fi
-          export HOST=${{matrix.architecture}}-${CO}-${{matrix.target_os}}-gnu
+          echo HOST="${{ github.workspace }}/depends/config.guess" >> $GITHUB_ENV
+          env | grep -E '^(CI_|STEP_|CCACHE_|WINEDEBUG|LC_ALL|BOOST_TEST_RANDOM|HOST)' | tee /tmp/env
       #if [ -n ${{ env.DPKG_ADD_ARCH }} ] then
       #  sudo dpkg --add-architecture ${{ env.DPKG_ADD_ARCH }}
       #fi
@@ -143,8 +146,14 @@ jobs:
       - name: Install Dependencies
         run: |
           RETRY() { for i in {1..3}; do $* && break || sleep 1; done; }
-          RETRY sudo apt-get update
-          RETRY sudo apt-get install --no-install-recommends --no-upgrade -qq $PACKAGES ${{ env.CI_BUILD_PACKAGES }}  linux-headers-generic
+          if [[ "$(uname -s)" == "Darwin" ]]; then
+            export HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK=1
+            brew install --quiet python@3 || brew link --overwrite python@3
+            brew install --quiet ${{ env.CI_PACKAGES }} ${{ env.CI_BUILD_PACKAGES }}
+          else
+            RETRY sudo apt-get update
+            RETRY sudo apt-get install --no-install-recommends --no-upgrade -qq ${{ env.CI_PACKAGES }} ${{ env.CI_BUILD_PACKAGES }} linux-headers-generic
+          fi
 
       - name: Ensure default datadir does not exist
         run: echo "> $HOME/.tapyrus"
@@ -157,22 +166,31 @@ jobs:
         shell: bash
 
       - name: Prepare SDKs
+        if: ${{ matrix.target_os }} == "darwin"
         run: |
+          echo HOST=${{matrix.architecture}}-${{matrix.target_os}}-gnu  >> $GITHUB_ENV
+          RETRY() { for i in {1..3}; do $* && break || sleep 1; done; }
           mkdir -p depends/SDKs depends/sdk-sources
-          if [ -n "$OSX_SDK" ] && [ ! -f depends/sdk-sources/MacOSX${OSX_SDK}.sdk.tar.gz ]; then
-            curl --location --fail $SDK_URL/MacOSX${OSX_SDK}.sdk.tar.gz -o depends/sdk-sources/MacOSX${OSX_SDK}.sdk.tar.gz
-          fi
-          if [ -n "$OSX_SDK" ] && [ -f depends/sdk-sources/MacOSX${OSX_SDK}.sdk.tar.gz ]; then
-            tar -C depends/SDKs -xf depends/sdk-sources/MacOSX${OSX_SDK}.sdk.tar.gz
-          fi
+          export XCODE_VERSION=15.0
+          export XCODE_BUILD_ID=15A240d
+          OSX_SDK_BASENAME="Xcode-${XCODE_VERSION}-${XCODE_BUILD_ID}-extracted-SDK-with-libcxx-headers"
 
-      #- name: Update Alternatives for MinGW
-      #  if: ${{ contains($HOST, '-mingw32') }}
-      #  run: sudo update-alternatives --set $HOST -g++ $(which ${HOST} -g++-posix)
+          if [ -n "$XCODE_VERSION" ] && [ ! -d "depends/SDKs/${OSX_SDK_BASENAME}" ]; then
+            OSX_SDK_FILENAME="${OSX_SDK_BASENAME}.tar.gz"
+            OSX_SDK_PATH="depends/sdk-sources/${OSX_SDK_FILENAME}"
+            if [ ! -f "$OSX_SDK_PATH" ]; then
+              RETRY curl --location --fail "${{env.CI_SDK_URL}}/${OSX_SDK_FILENAME}" -o "$OSX_SDK_PATH"
+            fi
+            tar -C "depends/SDKs" -xf "$OSX_SDK_PATH"
+          fi
+          #if ${{ contains(github.HOST, '-mingw32') }}
+          #  sudo update-alternatives --set $HOST -g++ $(which ${HOST} -g++-posix)
+          #fi
 
       - name: Build Dependencies
         if: ${{ env.CI_DEPENDS_OPTS != '' }}
         run: |
+          echo "HOST=${HOST}"
           CONFIG_SHELL= make ${{ env.CI_MAKEJOBS }} -C depends HOST=${HOST} ${{ env.CI_DEPENDS_OPTS }}
 
       - name: Build Tapyrus Core
@@ -180,50 +198,45 @@ jobs:
           # Set environment variables
           export CC=${CC}
           export CXX=${CXX}
-          export STEP_OUTDIR="${{ env.CI_BASE_OUTDIR }}/${{ github.sha }}/${HOST}"
-          export CONFIG_ALL="--disable-dependency-tracking --with-gui=${{ matrix.gui}} --prefix=${{ github.workspace }}/depends/${HOST} --bindir=${STEP_OUTDIR}/bin --libdir=${STEP_OUTDIR}/lib"
+          export OUTDIR="${{ env.CI_BASE_OUTDIR }}/${{ github.sha }}/${HOST}"
+          export CONFIG_ALL="--disable-dependency-tracking --with-gui=${{ matrix.gui}} --prefix=${{ github.workspace }}/depends/${HOST} --bindir=${OUTDIR}/bin --libdir=${OUTDIR}/lib CXX=${CXX} CC=${CC}"
 
           ccache --max-size=${{ env.CI_CCACHE_SIZE }}
+          
           echo "===== autogen begin ====="
           test -n "$CONFIG_SHELL" && bash -c "$CONFIG_SHELL -c './autogen.sh'" || ./autogen.sh
           mkdir -p build && cd build
-          echo "===== configure begin with options: $CONFIG_ALL $CONFIG_OS_OPT ====="
-          ../configure --cache-file=config.cache $CONFIG_ALL $CONFIG_OS_OPT $DEBUG_FLAGS || (cat config.log && false)
+          
+          echo "===== configure begin with options: ${{ env.CI_CONFIG_OS_OPT }} $CONFIG_ALL ====="
+          ../configure --cache-file=config.cache ${{ env.CI_CONFIG_OS_OPT }} $CONFIG_ALL $DEBUG_FLAGS || (cat config.log && false)
+          cat test/config.ini
+          
           echo "===== configure completed; make begin with options ${{ env.CI_MAKEJOBS }} ${{ env.CI_GOAL }} ====="
           make ${{ env.CI_MAKEJOBS }} ${{ env.CI_GOAL }}
+          
           echo "===== make completed ====="
-          cp ${STEP_OUTDIR}/test/config.ini test/config.ini
-
-  #test:
-  #  name: Test on Multiple Runners
-  #  runs-on: ${{ matrix.runner }}
-  #  strategy:
-  #    matrix:
-  #      runner: [ubuntu-22.04, ubuntu24.04]
-
-  #  steps:
-  #    - uses: actions/checkout@v4
-
-
-      - name: Run Unit and Util Tests
-        if: ${{ env.CI_RUN_TESTS == 'true' }}
-        run: |
           LD_LIBRARY_PATH=${{ github.workspace }}/depends/${HOST}/lib  make ${{ env.CI_MAKEJOBS }} check VERBOSE=1
+          echo "===== unit test completed ====="
 
-      - name: Run Functional Tests
-        if: ${{ env.CI_RUN_TESTS == 'true' }}
-        run: |
-          LD_LIBRARY_PATH=${{ github.workspace }}/depends/${HOST}/lib test/functional/test_runner.py \
+          export LD_LIBRARY_PATH=${{ github.workspace }}/depends/${HOST}/lib
+          if [ "${{ matrix.debug }}" == "true" ]; then
+            export debugscripts="--debugscripts"
+          fi
+          test/functional/test_runner.py \
             --combinedlogslen=4000 \
             --coverage \
             --failfast \
             --quiet \
             --extended ${debugscripts}
+      #- name: Run Functional Tests
+      #  if: ${{ env.CI_RUN_TESTS == 'true' }}
+      #  run: |
+
 
       - name: Run Benchmarks
         if: ${{ env.CI_RUN_BENCH == 'true' }}
         run: |
-          LD_LIBRARY_PATH=${{ github.workspace }}/depends/${HOST}/lib ${STEP_OUTDIR} /bin/bench_tapyrus -scaling=0.001
+          LD_LIBRARY_PATH=${{ github.workspace }}/depends/${HOST}/lib ${OUTDIR} /bin/bench_tapyrus -scaling=0.001
 
       - name: Collect Core Dumps
         uses: actions/upload-artifact@v3
