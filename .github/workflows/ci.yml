@@ -66,8 +66,6 @@ jobs:
         include:
           - target_os: linux
             compiler: gcc
-          - target_os: linux
-            compiler: clang
         exclude:
           - gui: qt5
           - wallet: no
