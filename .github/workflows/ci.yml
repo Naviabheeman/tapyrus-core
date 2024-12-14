@@ -158,7 +158,7 @@ jobs:
           if [[ "$(uname -s)" == "Darwin" ]]; then
             export HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK=1
             brew install --quiet python@3 || brew link --overwrite python@3
-            brew install --quiet ${{ env.CI_PACKAGES }} ${{ env.CI_BUILD_PACKAGES }}
+            brew install --quiet ${{ env.DARWIN_NATIVE_PACKAGES }}
           else
             RETRY sudo apt-get update
             RETRY sudo apt-get install --no-install-recommends --no-upgrade -qq ${{ env.CI_PACKAGES }} ${{ env.CI_BUILD_PACKAGES }} linux-headers-generic
