@@ -60,6 +60,8 @@ jobs:
         target_os: [linux, darwin]
         architecture: [x86_64, arm64]
         compiler: [gcc, clang]
+        gui: [qt5, no]
+        wallet: [yes, no]
         runs_on:
           - ubuntu-22.04
           - macos-13
