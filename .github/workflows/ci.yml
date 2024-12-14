@@ -107,7 +107,7 @@ jobs:
           MATRIX_CONTEXT: ${{ toJson(matrix) }}
         run: |
           export NAME_OF_CONFIG="${{ matrix.target_os }}-${{ matrix.architecture }}-${{ matrix.compiler }}-debug_${{ matrix.debug }}-gui_${{ matrix.gui }}"
-          echo HOST=${{ github.workspace}}/depends/config.guess }} >> $GITHUB_ENV
+          echo HOST=${{ github.workspace}}/depends/config.guess >> $GITHUB_ENV
           echo "Running $NAME_OF_CONFIG HOST=$HOST"
           if [ "${{ matrix.target_os }}" == "windows" ]; then
             echo CI_PACKAGES="$WIN_PACKAGES" >> $GITHUB_ENV
