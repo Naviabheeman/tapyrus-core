@@ -151,6 +151,11 @@ jobs:
       #if [ -n ${{ env.DPKG_ADD_ARCH }} ] then
       #  sudo dpkg --add-architecture ${{ env.DPKG_ADD_ARCH }}
       #fi
+      - name: Setup XCode
+        if: ${{ runner.os == 'macOS' }}
+        run: |
+          sudo xcode-select --switch /Applications/Xcode_15.0.app
+          clang --version
 
       - name: Install Dependencies
         run: |
@@ -170,12 +175,14 @@ jobs:
       - name: Enable Core Dumps
         run: |
           mkdir -p $GITHUB_WORKSPACE/coredumps
-          echo "/github/workspace/coredumps/core.%e.%p" | sudo tee /proc/sys/kernel/core_pattern
+          if [[ $RUNNER_OS == "Linux" ]]; then
+            echo "/github/workspace/coredumps/core.%e.%p" | sudo tee /proc/sys/kernel/core_pattern
+          fi
           ulimit -c unlimited
         shell: bash
 
       - name: Prepare SDKs
-        if: ${{ matrix.target_os }} == "darwin"
+        if: ${{ runner.os == 'ubuntu' && matrix.target_os == 'darwin'}}
         run: |
           echo HOST=${{matrix.architecture}}-${{matrix.target_os}}-gnu  >> $GITHUB_ENV
           RETRY() { for i in {1..3}; do $* && break || sleep 1; done; }
