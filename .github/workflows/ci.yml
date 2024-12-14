@@ -90,6 +90,13 @@ jobs:
           export PATH=$(echo $PATH | tr ':' "\n" | sed '/\/opt\/python/d' | tr "\n" ":" | sed "s|::|:|g")
 
       - name: Export Environment Variables
+        env:
+          GITHUB_CONTEXT: ${{ toJson(github) }}
+          JOB_CONTEXT: ${{ toJson(job) }}
+          STEPS_CONTEXT: ${{ toJson(steps) }}
+          RUNNER_CONTEXT: ${{ toJson(runner) }}
+          STRATEGY_CONTEXT: ${{ toJson(strategy) }}
+          MATRIX_CONTEXT: ${{ toJson(matrix) }}
         run: |
           export NAME_OF_CONFIG="${{ matrix.target_os }}-${{ matrix.architecture }}-${{ matrix.compiler }}-debug_${{ matrix.debug }}-gui_${{ matrix.gui }}"
           echo "Running $NAME_OF_CONFIG"
@@ -126,6 +133,14 @@ jobs:
           fi
           echo HOST="${{ github.workspace }}/depends/config.guess" >> $GITHUB_ENV
           env | grep -E '^(CI_|STEP_|CCACHE_|WINEDEBUG|LC_ALL|BOOST_TEST_RANDOM|HOST)' | tee /tmp/env
+          - name: Dump GitHub context
+            echo "ALL CONTEXT:"
+            echo "$GITHUB_CONTEXT"
+            echo "$JOB_CONTEXT"
+            echo "$STEPS_CONTEXT"
+            echo "$RUNNER_CONTEXT"
+            echo "$STRATEGY_CONTEXT"
+            echo "$MATRIX_CONTEXT"
       #if [ -n ${{ env.DPKG_ADD_ARCH }} ] then
       #  sudo dpkg --add-architecture ${{ env.DPKG_ADD_ARCH }}
       #fi
