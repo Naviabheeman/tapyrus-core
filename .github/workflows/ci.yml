@@ -54,25 +54,30 @@ jobs:
 
   build-linux:
     name: ${{ matrix.target_os }}-${{ matrix.architecture }}-${{ matrix.compiler }}-debug_${{ matrix.debug }}-gui_${{ matrix.gui }}-wallet_${{ matrix.wallet }}
-    runs-on:  ${{ matrix.target_os == 'darwin' && 'macos-13' || 'ubuntu-22.04' }}
+    runs-on: ${{ matrix.runs_on }}
     strategy:
       matrix:
-        target_os: [linux, darwin, windows]
+        target_os: [linux, darwin]
         architecture: [x86_64, arm64]
         compiler: [gcc, clang]
-        debug: [true, false]
-        gui: [qt5, no]
-        wallet: [yes, no]
+        runs_on:
+          - ubuntu-22.04
+          - macos-13
         include:
           - target_os: linux
+            runs_on: ubuntu-22.04
             compiler: gcc
+          - target_os: linux
+            runs_on: ubuntu-22.04
+            compiler: clang
+          - target_os: darwin
+            runs_on: macos-13
+            compiler: clang
         exclude:
           - gui: qt5
           - wallet: no
           - architecture: arm64
-          - target_os: darwin
           - target_os: windows
-          - compiler: clang
 
     steps:
       - uses: actions/checkout@v4
