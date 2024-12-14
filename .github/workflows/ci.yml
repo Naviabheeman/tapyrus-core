@@ -52,7 +52,7 @@ jobs:
           echo "PENDING some lint files! pending lint file name has 'pending-' prefix."
           ls test/lint/ | grep ^pending-
 
-  build-linux:
+  build_test:
     name: ${{ matrix.target_os }}-${{ matrix.architecture }}-${{ matrix.compiler }}-debug_${{ matrix.debug }}-gui_${{ matrix.gui }}-wallet_${{ matrix.wallet }}
     runs-on: ${{ matrix.runs_on }}
     strategy:
@@ -107,7 +107,8 @@ jobs:
           MATRIX_CONTEXT: ${{ toJson(matrix) }}
         run: |
           export NAME_OF_CONFIG="${{ matrix.target_os }}-${{ matrix.architecture }}-${{ matrix.compiler }}-debug_${{ matrix.debug }}-gui_${{ matrix.gui }}"
-          echo "Running $NAME_OF_CONFIG"
+          echo HOST=${{ github.workspace}}/depends/config.guess }} >> $GITHUB_ENV
+          echo "Running $NAME_OF_CONFIG HOST=$HOST"
           if [ "${{ matrix.target_os }}" == "windows" ]; then
             echo CI_PACKAGES="$WIN_PACKAGES" >> $GITHUB_ENV
             echo CI_CONFIG_OS_OPT="$WIN_CONFIG" >> $GITHUB_ENV
@@ -139,7 +140,6 @@ jobs:
           if [ "${{ matrix.gui }}" == "no" ]; then
             echo CI_DEPENDS_OPTS="NO_QT=1" >> $GITHUB_ENV
           fi
-          echo HOST="${{ github.workspace }}/depends/config.guess" >> $GITHUB_ENV
           env | grep -E '^(CI_|STEP_|CCACHE_|WINEDEBUG|LC_ALL|BOOST_TEST_RANDOM|HOST)' | tee /tmp/env
           echo "ALL CONTEXT:"
           echo "$GITHUB_CONTEXT"
