@@ -57,7 +57,7 @@ jobs:
     runs-on: ${{ matrix.runs_on }}
     strategy:
       matrix:
-        target_os: [linux, darwin]
+        target_os: [linux, darwin, windows]
         architecture: [x86_64, arm64]
         compiler: [gcc, clang]
         gui: [qt5, no]
@@ -80,6 +80,12 @@ jobs:
           - wallet: no
           - architecture: arm64
           - target_os: windows
+          - target_os: darwin
+            compiler: gcc
+          - target_os: linux
+            runs_on: macos-13
+          - target_os: darwin
+            runs_on: ubuntu-22.04
 
     steps:
       - uses: actions/checkout@v4
