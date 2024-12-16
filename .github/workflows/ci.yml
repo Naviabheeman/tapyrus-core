@@ -60,6 +60,7 @@ jobs:
         target_os: [linux, darwin, windows]
         architecture: [x86_64, arm64]
         compiler: [gcc, clang]
+        debug: [yes, no]
         gui: [qt5, no]
         wallet: [yes, no]
         runs_on:
@@ -165,6 +166,9 @@ jobs:
             brew install --quiet python@3 || brew link --overwrite python@3
             brew install --quiet ${{ env.DARWIN_NATIVE_PACKAGES }}
             python3 -m pip install -U pip setuptools
+          elif [[ ${{ matrix.target_os }} == "darwin" ]]; then
+            RETRY sudo apt-get update
+            RETRY sudo apt-get install --no-install-recommends --no-upgrade -qq ${{ env.DARWIN_CROSS_PACKAGES }} linux-headers-generic
           else
             RETRY sudo apt-get update
             RETRY sudo apt-get install --no-install-recommends --no-upgrade -qq ${{ env.CI_PACKAGES }} linux-headers-generic
@@ -204,11 +208,11 @@ jobs:
           #  sudo update-alternatives --set $HOST -g++ $(which ${HOST} -g++-posix)
           #fi
 
-      - name: Build Dependencies
-        if: ${{ env.CI_DEPENDS_OPTS != '' }}
-        run: |
-          echo "HOST=${HOST}"
-          CONFIG_SHELL= make ${{ env.CI_MAKEJOBS }} -C depends HOST=${HOST} ${{ env.CI_DEPENDS_OPTS }}
+      #- name: Build Dependencies
+      #  if: ${{ env.CI_DEPENDS_OPTS != '' }}
+      #  run: |
+      #    echo "HOST=${HOST}"
+      #    CONFIG_SHELL= make ${{ env.CI_MAKEJOBS }} -C depends HOST=${HOST} ${{ env.CI_DEPENDS_OPTS }}
 
       - name: Build Tapyrus Core
         run: |
@@ -219,15 +223,16 @@ jobs:
           export CONFIG_ALL="--disable-dependency-tracking --with-gui=${{ matrix.gui}} --prefix=${{ github.workspace }}/depends/${HOST} --bindir=${OUTDIR}/bin --libdir=${OUTDIR}/lib CXX=${CXX} CC=${CC}"
 
           ccache --max-size=${{ env.CI_CCACHE_SIZE }}
-          
+
           echo "===== autogen begin ====="
           test -n "$CONFIG_SHELL" && bash -c "$CONFIG_SHELL -c './autogen.sh'" || ./autogen.sh
           mkdir -p build && cd build
-          
+
           echo "===== configure begin with options: ${{ env.CI_CONFIG_OS_OPT }} $CONFIG_ALL ====="
           ../configure --cache-file=config.cache ${{ env.CI_CONFIG_OS_OPT }} $CONFIG_ALL $DEBUG_FLAGS || (cat config.log && false)
           cat test/config.ini
-          
+          cp test/config.ini ${{ github.workspace }}/test/config.ini
+
           echo "===== configure completed; make begin with options ${{ env.CI_MAKEJOBS }} ${{ env.CI_GOAL }} ====="
           make ${{ env.CI_MAKEJOBS }} ${{ env.CI_GOAL }}
           
@@ -235,6 +240,10 @@ jobs:
           LD_LIBRARY_PATH=${{ github.workspace }}/depends/${HOST}/lib  make ${{ env.CI_MAKEJOBS }} check VERBOSE=1
           echo "===== unit test completed ====="
 
+
+      - name: Run Functional Tests
+        if: ${{ env.CI_RUN_TESTS == 'true' }}
+        run: |
           export LD_LIBRARY_PATH=${{ github.workspace }}/depends/${HOST}/lib
           if [ "${{ matrix.debug }}" == "true" ]; then
             export debugscripts="--debugscripts"
@@ -245,9 +254,6 @@ jobs:
             --failfast \
             --quiet \
             --extended ${debugscripts}
-      #- name: Run Functional Tests
-      #  if: ${{ env.CI_RUN_TESTS == 'true' }}
-      #  run: |
 
 
       - name: Run Benchmarks
