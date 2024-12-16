@@ -23,7 +23,6 @@ env:
   DARWIN_NATIVE_PACKAGES: "automake libtool pkg-config gnu-getopt ccache boost libevent miniupnpc libnatpmp zeromq qt@5 qrencode python-setuptools"
   WIN_PACKAGES: "build-essential clang libtool autotools-dev automake pkg-config curl git ca-certificates ccache bison python3 nsis g++-mingw-w64-x86-64 wine-binfmt wine64"
   LINUX_CONFIG: "--enable-zmq --with-incompatible-bdb --enable-reduce-exports --enable-usdt CPPFLAGS=-DDEBUG_LOCKORDER"
-  DARWIN_CONFIG: ""
   WIN_CONFIG: "--enable-reduce-exports"
   CI_DEBUG_CONFIG: "--enable-debug"
   CI_CONFIG_OS_OPT: ""
@@ -118,7 +117,7 @@ jobs:
             echo CI_RUN_BENCH=false >> $GITHUB_ENV
           elif [ "${{ matrix.target_os }}" == "darwin" ]; then
             echo CI_PACKAGES="$DARWIN_CROSS_PACKAGES" >> $GITHUB_ENV
-            echo CI_CONFIG_OS_OPT="$env.DARWIN_CONFIG" >> $GITHUB_ENV
+            echo CI_CONFIG_OS_OPT="" >> $GITHUB_ENV
             echo CI_GOAL="all deploy" >> $GITHUB_ENV
             echo CI_RUN_TESTS=false >> $GITHUB_ENV
             echo CI_RUN_BENCH=false >> $GITHUB_ENV
