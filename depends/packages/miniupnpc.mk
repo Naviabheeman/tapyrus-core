@@ -9,7 +9,7 @@ $(package)_patches=dont_leak_info.patch respect_mingw_cflags.patch
 # See discussion in https://github.com/bitcoin/bitcoin/pull/25964.
 define $(package)_set_vars
 $(package)_build_opts=CC="$($(package)_cc)"
-$(info $PATH)
+$(info $(PATH))
 $(package)_build_opts_darwin=LIBTOOL="$($(package)_libtool)"
 $(package)_build_opts_mingw32=-f Makefile.mingw CFLAGS="$($(package)_cflags) -D_WIN32_WINNT=0x0601"
 $(package)_build_env+=CFLAGS="$($(package)_cflags) $($(package)_cppflags)" AR="$($(package)_ar)"
@@ -21,7 +21,7 @@ define $(package)_preprocess_cmds
 endef
 
 define $(package)_build_cmds
-	$(info $PATH)
+	$(info $(PATH))
 	$(MAKE) libminiupnpc.a $($(package)_build_opts)
 endef
 
