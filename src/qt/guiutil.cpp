@@ -58,7 +58,7 @@
 #include <QUrlQuery>
 #include <QMouseEvent>
 
-
+#include <fstream>
 #if QT_VERSION >= 0x50200
 #include <QFontDatabase>
 #endif
@@ -404,7 +404,7 @@ bool openBitcoinConf()
     fs::path pathConfig = GetConfigFile(gArgs.GetArg("-conf", BITCOIN_CONF_FILENAME));
 
     /* Create the file */
-    fs::ofstream configFile(pathConfig, std::ios_base::app);
+    std::ofstream configFile(pathConfig, std::ios_base::app);
 
     if (!configFile.good())
         return false;
