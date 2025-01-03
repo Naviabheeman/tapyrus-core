@@ -9,8 +9,6 @@ AC_DEFUN([BITCOIN_QT_FAIL],[
     if test "x$tapyrus_enable_qt" != xno; then
       AC_MSG_WARN([$1; tapyrus_qt frontend will not be built])
     fi
-    tapyrus_enable_qt=no
-    tapyrus_enable_qt_test=no
   else
     AC_MSG_ERROR([$1])
   fi
