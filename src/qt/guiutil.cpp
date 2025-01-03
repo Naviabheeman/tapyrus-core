@@ -63,8 +63,6 @@
 #include <QFontDatabase>
 #endif
 
-static fs::detail::utf8_codecvt_facet utf8;
-
 namespace GUIUtil {
 
 QString dateTimeStr(const QDateTime &date)
@@ -396,7 +394,7 @@ void openDebugLogfile()
 
     /* Open debug.log with the associated application */
     if (fs::exists(pathDebug))
-        QDesktopServices::openUrl(QUrl::fromLocalFile(boostPathToQString(pathDebug)));
+        QDesktopServices::openUrl(QUrl::fromLocalFile(pathToQString(pathDebug)));
 }
 
 bool openBitcoinConf()
@@ -412,7 +410,7 @@ bool openBitcoinConf()
     configFile.close();
 
     /* Open tapyrus.conf with the associated application */
-    return QDesktopServices::openUrl(QUrl::fromLocalFile(boostPathToQString(pathConfig)));
+    return QDesktopServices::openUrl(QUrl::fromLocalFile(pathToQString(pathConfig)));
 }
 
 ToolTipToRichTextFilter::ToolTipToRichTextFilter(int _size_threshold, QObject *parent) :
@@ -811,14 +809,14 @@ void setClipboard(const QString& str)
     QApplication::clipboard()->setText(str, QClipboard::Selection);
 }
 
-fs::path qstringToBoostPath(const QString &path)
+fs::path qstringToPath(const QString &path)
 {
-    return fs::path(path.toStdString(), utf8);
+    return fs::u8path(path.toStdString());
 }
 
-QString boostPathToQString(const fs::path &path)
+QString pathToQString(const fs::path &path)
 {
-    return QString::fromStdString(path.string(utf8));
+    return QString::fromStdString(path.qtf8string());
 }
 
 QString formatDurationStr(int secs)
