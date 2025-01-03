@@ -816,7 +816,7 @@ fs::path qstringToPath(const QString &path)
 
 QString pathToQString(const fs::path &path)
 {
-    return QString::fromStdString(path.qtf8string());
+    return QString::fromStdString(path.ustring());
 }
 
 QString formatDurationStr(int secs)
@@ -879,7 +879,9 @@ QString formatServicesStr(quint64 mask)
 
 QString formatPingTime(double dPingTime)
 {
-    return (dPingTime == std::numeric_limits<int64_t>::max()/1e6 || dPingTime == 0) ? QObject::tr("N/A") : QString(QObject::tr("%1 ms")).arg(QString::number((int)(dPingTime * 1000), 10));
+    return (ping_time == std::chrono::microseconds::max() || ping_time == 0us) ?
+        QObject::tr("N/A") :
+        QObject::tr("%1 ms").arg(QString::number((int)(count_microseconds(ping_time) / 1000), 10));
 }
 
 QString formatTimeOffset(int64_t nTimeOffset)
