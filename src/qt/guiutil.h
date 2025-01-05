@@ -194,7 +194,7 @@ namespace GUIUtil
     QString formatServicesStr(quint64 mask);
 
     /* Format a CNodeCombinedStats.dPingTime into a user-readable string or display N/A, if 0*/
-    QString formatPingTime(double dPingTime);
+    QString formatPingTime(std::chrono::duration<double> dPingTime)
 
     /* Format a CNodeCombinedStats.nTimeOffset into a user-readable string. */
     QString formatTimeOffset(int64_t nTimeOffset);

@@ -877,11 +877,20 @@ QString formatServicesStr(quint64 mask)
         return QObject::tr("None");
 }
 
-QString formatPingTime(double dPingTime)
+QString formatPingTime(std::chrono::duration<double> dPingTime)
 {
-    return (dPingTime == std::chrono::microseconds::max() || dPingTime == 0us) ?
-        QObject::tr("N/A") :
-        QObject::tr("%1 ms").arg(QString::number((int)(count_microseconds(dPingTime) / 1000), 10));
+    using namespace std::chrono;
+    constexpr auto maxPingTime = std::numeric_limits<int64_t>::max();
+
+    if (dPingTime == duration<double>(0) || dPingTime.count() == static_cast<double>(maxPingTime) / 1e6)
+    {
+        return QObject::tr("N/A");
+    }
+    else
+    {
+        auto milliseconds = duration_cast<milliseconds>(dPingTime).count();
+        return QString(QObject::tr("%1 ms")).arg(QString::number(static_cast<int>(milliseconds), 10));
+    }
 }
 
 QString formatTimeOffset(int64_t nTimeOffset)
