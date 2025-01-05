@@ -660,7 +660,7 @@ fs::path static GetAutostartFilePath()
 
 bool GetStartOnSystemStartup()
 {
-    fs::ifstream optionFile(GetAutostartFilePath());
+    std::ifstream optionFile(GetAutostartFilePath());
     if (!optionFile.good())
         return false;
     // Scan through file for "Hidden=true":
@@ -691,7 +691,7 @@ bool SetStartOnSystemStartup(bool fAutoStart)
 
         fs::create_directories(GetAutostartDir());
 
-        fs::ofstream optionFile(GetAutostartFilePath(), std::ios_base::out|std::ios_base::trunc);
+        std::ofstream optionFile(GetAutostartFilePath(), std::ios_base::out|std::ios_base::trunc);
         if (!optionFile.good())
             return false;
 
@@ -817,7 +817,7 @@ fs::path qstringToPath(const QString &path)
 
 QString pathToQString(const fs::path &path)
 {
-    return QString::fromStdString(path.utf8string());
+    return QString::fromStdString(path.u8string());
 }
 
 QString formatDurationStr(int secs)
@@ -889,7 +889,7 @@ QString formatPingTime(std::chrono::duration<double> dPingTime)
     }
     else
     {
-        auto milliseconds = duration_cast<milliseconds>(dPingTime).count();
+        auto milliseconds = duration_cast<std::chrono::milliseconds>(dPingTime).count();
         return QString(QObject::tr("%1 ms")).arg(QString::number(static_cast<int>(milliseconds), 10));
     }
 }
