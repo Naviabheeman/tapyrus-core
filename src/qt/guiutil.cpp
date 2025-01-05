@@ -878,19 +878,19 @@ QString formatServicesStr(quint64 mask)
         return QObject::tr("None");
 }
 
-QString formatPingTime(std::chrono::duration<double> dPingTime)
+QString formatPingTime(double dPingTime)
 {
-    using namespace std::chrono;
-    constexpr auto maxPingTime = std::numeric_limits<int64_t>::max();
+    constexpr auto maxPingTime = std::numeric_limits<int64_t>::max() / 1e6;
 
-    if (dPingTime == duration<double>(0) || dPingTime.count() == static_cast<double>(maxPingTime) / 1e6)
+    if (dPingTime == 0 || dPingTime == static_cast<double>(maxPingTime))
     {
         return QObject::tr("N/A");
     }
     else
     {
-        auto milliseconds = duration_cast<std::chrono::milliseconds>(dPingTime).count();
-        return QString(QObject::tr("%1 ms")).arg(QString::number(static_cast<int>(milliseconds), 10));
+        // Convert seconds to milliseconds
+        auto milliseconds = static_cast<int>(dPingTime * 1000);
+        return QString(QObject::tr("%1 ms")).arg(QString::number(milliseconds, 10));
     }
 }
 
