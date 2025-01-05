@@ -880,15 +880,16 @@ QString formatServicesStr(quint64 mask)
 
 QString formatPingTime(double dPingTime)
 {
-    constexpr auto maxPingTime = std::numeric_limits<int64_t>::max() / 1e6;
+    using namespace std::chrono;
 
-    if (dPingTime == 0 || dPingTime == static_cast<double>(maxPingTime))
+    constexpr double maxPingTime = duration_cast<duration<double>>(microseconds::max()).count() / 1e6;
+
+    if (dPingTime == 0 || dPingTime >= maxPingTime)
     {
         return QObject::tr("N/A");
     }
     else
     {
-        // Convert seconds to milliseconds
         auto milliseconds = static_cast<int>(dPingTime * 1000);
         return QString(QObject::tr("%1 ms")).arg(QString::number(milliseconds, 10));
     }
