@@ -52,6 +52,7 @@
 #include <QFont>
 #include <QKeyEvent>
 #include <QLineEdit>
+#include <QString>
 #include <QSettings>
 #include <QTextDocument> // for Qt::mightBeRichText
 #include <QThread>
