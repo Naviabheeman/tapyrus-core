@@ -2088,9 +2088,6 @@ bool static FlushStateToDisk(CValidationState &state, FlushStateMode mode, int n
     std::set<int> setFilesToPrune;
     bool full_flush_completed = false;
 
-    const size_t coins_count = pcoinsTip->GetCacheSize();
-    const size_t coins_mem_usage = pcoinsTip->DynamicMemoryUsage();
-
     try {
     {
         bool fFlushForPrune = false;
