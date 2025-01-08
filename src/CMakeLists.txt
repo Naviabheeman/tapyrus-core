@@ -66,7 +66,6 @@ add_subdirectory(univalue)
 # Various completely unrelated features shared by all executables.
 add_library(util
         clientversion.cpp
-        compat/strnlen.cpp
         fs.cpp
         logging.cpp
         random.cpp
