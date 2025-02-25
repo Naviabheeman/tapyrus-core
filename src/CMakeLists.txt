@@ -72,6 +72,7 @@ target_include_directories(util
         .
         # To access the config.
         ${CMAKE_CURRENT_BINARY_DIR}
+        Boost_INCLUDE_DIR
         )
 
 # Target specific configs
@@ -84,24 +85,12 @@ if(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
     target_link_libraries(util ${WS2_32_LIBRARY})
 endif()
 
-# Boost packages
-set(BOOST_PACKAGES_REQUIRED filesystem)
 
-function(prepend var prefix)
-    set(listVar "")
-    foreach(f ${ARGN})
-        list(APPEND listVar "${prefix}${f}")
-    endforeach(f)
-    set(${var} "${listVar}" PARENT_SCOPE)
-endfunction(prepend)
-
-prepend(BOOST_LIBRARIES "Boost::" ${BOOST_PACKAGES_REQUIRED})
-
-find_package(Boost 1.81 REQUIRED ${BOOST_PACKAGES_REQUIRED})
-target_link_libraries(util univalue crypto ${BOOST_LIBRARIES})
-
-# Make sure boost uses std::atomic (it doesn't before 1.63)
-target_compile_definitions(util PUBLIC BOOST_SP_USE_STD_ATOMIC BOOST_AC_USE_STD_ATOMIC)
+find_package(Boost 1.81 REQUIRED)
+include(BrewHelper)
+find_brew_prefix(BOOST_PREFIX Boost)
+message ("BOOST_PREFIX :${BOOST_PREFIX}")
+target_link_libraries(util univalue crypto)
 
 # More completely unrelated features shared by all executables.
 # Because nothing says this is different from util than "common"
@@ -130,6 +119,7 @@ add_library(common
         )
 
 target_link_libraries(common util secp256k1 tapyrusconsensus)
+target_include_directories(common PUBLIC ${BOOST_PREFIX}/include)
 
 # libtapyrusconsensus
 add_library(tapyrusconsensus
@@ -148,6 +138,7 @@ add_library(tapyrusconsensus
         utilstrencodings.cpp
         )
 target_link_libraries(tapyrusconsensus common)
+target_include_directories(tapyrusconsensus PUBLIC ${BOOST_PREFIX}/include)
 
 # Tapyrus server facilities
 add_library(server
@@ -219,6 +210,7 @@ target_link_libraries(server
         tapyrusconsensus
         leveldb
         )
+target_include_directories(server PUBLIC ${BOOST_PREFIX}/include)
 
 if(UPNP_FOUND)
     target_link_libraries(server
