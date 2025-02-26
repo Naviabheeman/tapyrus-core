@@ -41,6 +41,10 @@ add_subdirectory(leveldb)
 add_subdirectory(secp256k1)
 add_subdirectory(univalue)
 
+#boost for headers only
+include(BrewHelper)
+find_brew_prefix(BOOST_PREFIX Boost)
+
 # Because the Bitcoin ABc source code is disorganised, we
 # end up with a bunch of libraries without any aparent
 # cohesive structure. This is inherited from Bitcoin Core
@@ -72,7 +76,7 @@ target_include_directories(util
         .
         # To access the config.
         ${CMAKE_CURRENT_BINARY_DIR}
-        Boost_INCLUDE_DIR
+        ${BOOST_PREFIX}/include
         )
 
 # Target specific configs
@@ -85,11 +89,6 @@ if(${CMAKE_SYSTEM_NAME} MATCHES "Windows")
     target_link_libraries(util ${WS2_32_LIBRARY})
 endif()
 
-
-find_package(Boost 1.81 REQUIRED)
-include(BrewHelper)
-find_brew_prefix(BOOST_PREFIX Boost)
-message ("BOOST_PREFIX :${BOOST_PREFIX}")
 target_link_libraries(util univalue crypto)
 
 # More completely unrelated features shared by all executables.
@@ -258,6 +257,7 @@ if(BUILD_TAPYRUS_CLI)
     endif()
 
     target_link_libraries(tapyrus-cli tapyrusconsensus common rpcclient Event)
+    target_include_directories(tapyrus-cli PUBLIC ${BOOST_PREFIX}/include)
 endif()
 
 # tapyrus-tx
@@ -268,6 +268,7 @@ if(BUILD_TAPYRUS_TX)
     endif()
 
     target_link_libraries(tapyrus-tx tapyrusconsensus)
+    target_include_directories(tapyrus-tx PUBLIC ${BOOST_PREFIX}/include)
 endif()
 
 # tapyrus-genesis
