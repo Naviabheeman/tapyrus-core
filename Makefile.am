@@ -107,6 +107,8 @@ OSX_APP_BUILT=$(OSX_APP)/Contents/PkgInfo $(OSX_APP)/Contents/Resources/empty.lp
 	$(OSX_APP)/Contents/Resources/tapyrus.icns $(OSX_APP)/Contents/Info.plist \
 	$(OSX_APP)/Contents/MacOS/Tapyrus-Qt $(OSX_APP)/Contents/Resources/Base.lproj/InfoPlist.strings
 
+OSX_ZIP = $(OSX_VOLNAME).zip
+
 if BUILD_DARWIN
 $(OSX_ZIP): $(OSX_APP_BUILT) $(OSX_PACKAGING)
 	STRIP=$(STRIP) $(PYTHON) $(OSX_DEPLOY_SCRIPT) $(OSX_APP) $(OSX_VOLNAME) -translations-dir=$(QT_TRANSLATION_DIR) -zip
