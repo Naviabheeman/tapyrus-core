@@ -34,7 +34,6 @@ OSX_INSTALLER_ICONS=$(top_srcdir)/src/qt/res/icons/tapyrus.icns
 OSX_QT_TRANSLATIONS = da,de,es,hu,ru,uk,zh_CN,zh_TW
 OSX_PLIST=$(top_builddir)/share/qt/Info.plist #not installed
 
-
 DIST_DOCS = $(wildcard doc/*.md) $(wildcard doc/release-notes/*.md)
 DIST_CONTRIB = $(top_srcdir)/contrib/tapyrus-cli.bash-completion \
        $(top_srcdir)/contrib/tapyrus-tx.bash-completion \
@@ -127,6 +126,8 @@ $(APP_DIST_DIR)/$(OSX_APP)/Contents/MacOS/Tapyrus-Qt: $(OSX_APP_BUILT) $(OSX_PAC
 	OBJDUMP=$(OBJDUMP) $(PYTHON) $(OSX_DEPLOY_SCRIPT) $(OSX_APP) $(OSX_VOLNAME) -translations-dir=$(QT_TRANSLATION_DIR)
 
 deploydir: $(APP_DIST_DIR)/$(OSX_APP)/Contents/MacOS/Tapyrus-Qt
+	$(MKDIR_P) $(APP_DIST_DIR)
+	cp -r $(OSX_APP) $(APP_DIST_DIR)/
 endif !BUILD_DARWIN
 
 deploy: all-recursive  $(OSX_ZIP)
