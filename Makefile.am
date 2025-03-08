@@ -124,8 +124,6 @@ $(APP_DIST_DIR)/$(OSX_APP)/Contents/MacOS/Tapyrus-Qt: $(OSX_APP_BUILT) $(OSX_PAC
 	$(OBJDUMP) $(PYTHON) $(OSX_DEPLOY_SCRIPT) $(OSX_APP) $(OSX_VOLNAME) -translations-dir=$(QT_TRANSLATION_DIR)
 
 deploydir: $(APP_DIST_DIR)/$(OSX_APP)/Contents/MacOS/Tapyrus-Qt
-	$(MKDIR_P) $(APP_DIST_DIR)
-	cp -r $(OSX_APP) $(APP_DIST_DIR)/
 endif !BUILD_DARWIN
 
 deploy: $(OSX_ZIP)
