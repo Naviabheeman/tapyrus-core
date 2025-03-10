@@ -36,11 +36,11 @@ OSX_PLIST=$(top_builddir)/share/qt/Info.plist #not installed
 
 DIST_DOCS = $(wildcard doc/*.md) $(wildcard doc/release-notes/*.md)
 DIST_CONTRIB = $(top_srcdir)/contrib/tapyrus-cli.bash-completion \
-	       $(top_srcdir)/contrib/tapyrus-tx.bash-completion \
-	       $(top_srcdir)/contrib/tapyrus-genesis.bash-completion \
-	       $(top_srcdir)/contrib/tapyrusd.bash-completion \
-	       $(top_srcdir)/contrib/init \
-	       $(top_srcdir)/contrib/install_db4.sh
+       $(top_srcdir)/contrib/tapyrus-tx.bash-completion \
+       $(top_srcdir)/contrib/tapyrus-genesis.bash-completion \
+       $(top_srcdir)/contrib/tapyrusd.bash-completion \
+       $(top_srcdir)/contrib/init \
+       $(top_srcdir)/contrib/install_db4.sh
 DIST_SHARE = \
   $(top_srcdir)/share/genbuild.sh \
   $(top_srcdir)/share/rpcauth
