@@ -229,20 +229,20 @@ AC_DEFUN([BITCOIN_QT_CONFIGURE],[
   BITCOIN_QT_CHECK([
      tapyrus_enable_qt=yes
      tapyrus_enable_qt_test=yes
-    if test "x$have_qt_test" = xno; then
+    if test x$have_qt_test = xno; then
       tapyrus_enable_qt_test=no
     fi
     tapyrus_enable_qt_dbus=no
-    if test "x$use_dbus" != xno && test "x$have_qt_dbus" = xyes; then
+    if test x$use_dbus != xno && test x$have_qt_dbus = xyes; then
       tapyrus_enable_qt_dbus=yes
     fi
-    if test "x$use_dbus" = xyes && test "x$have_qt_dbus" = xno; then
+    if test x$use_dbus = xyes && test x$have_qt_dbus = xno; then
       AC_MSG_ERROR([libQtDBus not found. Install libQtDBus or remove --with-qtdbus.])
     fi
     if test "x$LUPDATE" = x; then
       AC_MSG_WARN([lupdate is required to update qt translations])
     fi
-    if test "$LCONVERT" = ""; then
+    if test "$LCONVERT" = x; then
       AC_MSG_WARN([lconvert tool is required to update Qt translations.])
     fi
   ],[
@@ -259,9 +259,7 @@ AC_DEFUN([BITCOIN_QT_CONFIGURE],[
   AC_SUBST(QT_LIBS)
   AC_SUBST(QT_LDFLAGS)
   AC_SUBST(QT_DBUS_INCLUDES)
-  AC_SUBST(QT_DBUS_LIBS)
   AC_SUBST(QT_TEST_INCLUDES)
-  AC_SUBST(QT_TEST_LIBS)
   AC_SUBST(QT_SELECT, qt5)
   AC_SUBST(MOC_DEFS)
 ])
@@ -368,7 +366,7 @@ AC_DEFUN([_BITCOIN_QT_FIND_LIBS],[
 
   BITCOIN_QT_CHECK([
     PKG_CHECK_MODULES([QT_TEST], [${qt_lib_prefix}Test${qt_lib_suffix} $qt_version], [QT_TEST_INCLUDES="$QT_TEST_CFLAGS"; have_qt_test=yes], [have_qt_test=no])
-    if test "x$use_dbus" != xno; then
+    if test x$use_dbus != xno; then
       PKG_CHECK_MODULES([QT_DBUS], [${qt_lib_prefix}DBus $qt_version], [QT_DBUS_INCLUDES="$QT_DBUS_CFLAGS"; have_qt_dbus=yes], [have_qt_dbus=no])
     fi
   ])

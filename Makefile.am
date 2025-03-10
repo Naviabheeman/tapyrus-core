@@ -126,7 +126,7 @@ $(APP_DIST_DIR)/$(OSX_APP)/Contents/MacOS/Tapyrus-Qt: $(OSX_APP_BUILT) $(OSX_PAC
 deploydir: $(APP_DIST_DIR)/$(OSX_APP)/Contents/MacOS/Tapyrus-Qt
 endif !BUILD_DARWIN
 
-deploy: $(OSX_ZIP)
+deploy: all-recursive  $(OSX_ZIP)
 endif
 
 $(BITCOIN_QT_BIN): FORCE

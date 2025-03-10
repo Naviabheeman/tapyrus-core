@@ -937,7 +937,7 @@ if test x$use_pkgconfig = xyes; then
         fi
       fi
 
-      if test "x$use_zmq" = "xyes"; then
+      if test x$use_zmq = xyes; then
         PKG_CHECK_MODULES([ZMQ],[libzmq >= 4],
           [AC_DEFINE([ENABLE_ZMQ],[1],[Define to 1 to enable ZMQ functions])],
           [AC_DEFINE([ENABLE_ZMQ],[0],[Define to 1 to enable ZMQ functions])
@@ -958,7 +958,7 @@ else
     fi
   fi
 
-  if test "x$use_zmq" = "xyes"; then
+  if test x$use_zmq = xyes; then
      AC_CHECK_HEADER([zmq.h],
        [AC_DEFINE([ENABLE_ZMQ],[1],[Define to 1 to enable ZMQ functions])],
        [AC_MSG_WARN([zmq.h not found, disabling zmq support])
@@ -972,7 +972,7 @@ else
     AC_DEFINE_UNQUOTED([ENABLE_ZMQ],[0],[Define to 1 to enable ZMQ functions])
   fi
 
-  if test "x$use_zmq" = "xyes"; then
+  if test x$use_zmq = xyes; then
     dnl Assume libzmq was built for static linking
     case $host in
       *mingw*)
