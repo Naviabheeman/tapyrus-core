@@ -5,8 +5,8 @@ dnl file COPYING or http://www.opensource.org/licenses/mit-license.php.
 dnl Helper for cases where a qt dependency is not met.
 dnl Output: If qt version is auto, set tapyrus_enable_qt to false. Else, exit.
 AC_DEFUN([BITCOIN_QT_FAIL],[
-  if test "x$tapyrus_qt_want_version" = xauto && test "x$tapyrus_qt_force" != xyes; then
-    if test "x$tapyrus_enable_qt" != xno; then
+  if test x$tapyrus_qt_want_version = xauto && test x$tapyrus_qt_force != xyes; then
+    if test x$tapyrus_enable_qt != xno; then
       AC_MSG_WARN([$1; tapyrus_qt frontend will not be built])
     fi
     tapyrus_enable_qt=no
@@ -17,7 +17,7 @@ AC_DEFUN([BITCOIN_QT_FAIL],[
 ])
 
 AC_DEFUN([BITCOIN_QT_CHECK],[
-  if test "x$tapyrus_enable_qt" != xno && test "x$tapyrus_qt_want_version" != xno; then
+  if test x$tapyrus_enable_qt != xno && test x$tapyrus_qt_want_version != xno; then
     true
     $1
   else
@@ -36,9 +36,9 @@ dnl Output: $1 is set to the path of $2 if found. $2 are searched in order.
 AC_DEFUN([BITCOIN_QT_PATH_PROGS],[
   BITCOIN_QT_CHECK([
     if test "x$3" != x; then
-      AC_PATH_PROGS($1,$2,,$3)
+      AC_PATH_PROGS([$1], [$2], [], [$3])
     else
-      AC_PATH_PROGS($1,$2)
+      AC_PATH_PROGS([$1], [$2])
     fi
     if test "x$$1" = x && test "x$4" != xyes; then
       BITCOIN_QT_FAIL([$1 not found])
@@ -151,7 +151,7 @@ AC_DEFUN([BITCOIN_QT_CONFIGURE],[
   ])
 
   if test "x$qt_bin_path" = x; then
-    qt_bin_path="`$PKG_CONFIG --variable=host_bins Qt5Core 2>/dev/null`"
+    qt_bin_path="`$PKG_CONFIG --variable=host_bins ${qt_lib_prefix}Core 2>/dev/null`"
   fi
 
   if test "x$use_hardening" != xno; then
@@ -292,9 +292,6 @@ AC_DEFUN([_BITCOIN_QT_IS_STATIC],[
       [tapyrus_cv_static_qt=yes],
       [tapyrus_cv_static_qt=no])
     ])
-  if test "x$tapyrus_cv_static_qt" = xyes; then
-    AC_DEFINE(QT_STATICPLUGIN, 1, [Define this symbol for static Qt plugins])
-  fi
 ])
 
 dnl Internal. Check if the link-requirements for static plugins are met.
@@ -302,17 +299,16 @@ dnl Requires: INCLUDES and LIBS must be populated as necessary.
 dnl Inputs: $1: A series of Q_IMPORT_PLUGIN().
 dnl Inputs: $2: The libraries that resolve $1.
 dnl Output: QT_LIBS is prepended or configure exits.
-AC_DEFUN([_BITCOIN_QT_CHECK_STATIC_PLUGIN],[
-  AC_MSG_CHECKING(for static Qt plugins: $2)
+AC_DEFUN([_BITCOIN_QT_CHECK_STATIC_PLUGIN], [
+  AC_MSG_CHECKING([for $1 ($2)])
   CHECK_STATIC_PLUGINS_TEMP_LIBS="$LIBS"
   LIBS="$2${qt_lib_suffix} $QT_LIBS $LIBS"
   AC_LINK_IFELSE([AC_LANG_PROGRAM([[
-    #define QT_STATICPLUGIN
-    #include <QtPlugin>
-    $1]],
-    [[return 0;]])],
-    [AC_MSG_RESULT(yes); QT_LIBS="$2${qt_lib_suffix} $QT_LIBS"],
-    [AC_MSG_RESULT(no); BITCOIN_QT_FAIL(Could not resolve: $2)])
+      #include <QtPlugin>
+      Q_IMPORT_PLUGIN($1)
+    ]])],
+    [AC_MSG_RESULT([yes]); QT_LIBS="$2${qt_lib_suffix} $QT_LIBS"],
+    [AC_MSG_RESULT([no]); BITCOIN_QT_FAIL([$1 not found.])])
   LIBS="$CHECK_STATIC_PLUGINS_TEMP_LIBS"
 ])
 
@@ -372,7 +368,7 @@ AC_DEFUN([_BITCOIN_QT_FIND_LIBS],[
 
   BITCOIN_QT_CHECK([
     PKG_CHECK_MODULES([QT_TEST], [${qt_lib_prefix}Test${qt_lib_suffix} $qt_version], [QT_TEST_INCLUDES="$QT_TEST_CFLAGS"; have_qt_test=yes], [have_qt_test=no])
-    if test "$use_dbus" != "no"; then
+    if test "x$use_dbus" != xno; then
       PKG_CHECK_MODULES([QT_DBUS], [${qt_lib_prefix}DBus $qt_version], [QT_DBUS_INCLUDES="$QT_DBUS_CFLAGS"; have_qt_dbus=yes], [have_qt_dbus=no])
     fi
   ])
