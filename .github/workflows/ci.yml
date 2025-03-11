@@ -48,14 +48,14 @@ jobs:
         run: |
           source ./default-env.sh
           HOST=x86_64-unknown-linux-gnu \
-          PACKAGES="python3-zmq libevent-dev bsdmainutils libboost-filesystem-dev libboost-test-dev libdb5.3++-dev libminiupnpc-dev libzmq3-dev libqrencode-dev systemtap-sdt-dev bpfcc-tools bpftrace" \
+          PACKAGES="python3-zmq libevent-dev bsdmainutils libboost-test-dev libdb5.3++-dev libminiupnpc-dev libzmq3-dev libqrencode-dev systemtap-sdt-dev bpfcc-tools bpftrace" \
           NO_DEPENDS=1 \
           DEP_OPTS="NO_QT=1" \
           RUN_TESTS=false \
           RUN_BENCH=true \
           DEBUD_MODE=true \
           GOAL="install" \
-          BITCOIN_CONFIG="--enable-zmq --with-incompatible-bdb --enable-reduce-exports --with-gui=no --enable-debug CPPFLAGS=-DDEBUG  CPPFLAGS=-DDEBUG_LOCKORDER" \
+          BITCOIN_CONFIG="--enable-zmq --with-incompatible-bdb --enable-reduce-exports --with-gui=no --enable-debug CPPFLAGS=-DDEBUG CPPFLAGS=-DDEBUG_LOCKORDER" \
           bash -xe ./build-test.sh
 
   build_x86_linux_no_gui_release:
@@ -71,7 +71,7 @@ jobs:
         run: |
           source ./default-env.sh
           HOST=x86_64-unknown-linux-gnu \
-          PACKAGES="python3-zmq libevent-dev bsdmainutils libboost-filesystem-dev libboost-test-dev libdb5.3++-dev libminiupnpc-dev libzmq3-dev libqrencode-dev systemtap-sdt-dev bpfcc-tools bpftrace" \
+          PACKAGES="python3-zmq libevent-dev bsdmainutils libboost-test-dev libdb5.3++-dev libminiupnpc-dev libzmq3-dev libqrencode-dev systemtap-sdt-dev bpfcc-tools bpftrace" \
           NO_DEPENDS=1 \
           DEP_OPTS="NO_QT=1" \
           RUN_TESTS=true \
@@ -81,8 +81,8 @@ jobs:
           BITCOIN_CONFIG="--enable-zmq --with-incompatible-bdb --enable-reduce-exports --with-gui=no --enable-usdt CPPFLAGS=-DDEBUG_LOCKORDER" \
           bash -xe ./build-test.sh
 
-  linux-with-qt:
-    name: "x86_64 Linux (uses qt5 dev package instead of depends Qt to speed up build and avoid timeout)"
+  build_x86_Linux_with_GUI_release:
+    name: x86_64 Linux, Qt5, Release
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
@@ -91,8 +91,27 @@ jobs:
       - run: |
           source ./default-env.sh
           HOST=x86_64-unknown-linux-gnu \
-          PACKAGES="python3-zmq qtbase5-dev qttools5-dev-tools libdbus-1-dev libharfbuzz-dev" \
-          DEP_OPTS="NO_UPNP=1 ALLOW_HOST_PACKAGES=1" \
+          PACKAGES="python3-zmq  bsdmainutils bpfcc-tools bpftrace" \
+          DEP_OPTS="LOG=1" \
+          RUN_TESTS=true \
+          RUN_BENCH=true \
+          GOAL="install" \
+          BITCOIN_CONFIG="--enable-zmq --with-gui=qt5 --enable-reduce-exports --enable-debug" \
+          CXXFLAGS="-g0 -O2" \
+          bash -xe ./build-test.sh
+
+  linux-with-qt:
+    name: x86_64 Linux, qt5 dev, Release"
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - run: |
+          source ./default-env.sh
+          HOST=x86_64-unknown-linux-gnu \
+          PACKAGES="python3-zmq qtbase5-dev qttools5-dev-tools qttools5-dev" \
+          DEP_OPTS="NO_UPNP=1" \
           RUN_TESTS=true \
           RUN_BENCH=true \
           GOAL="install" \
@@ -101,7 +120,7 @@ jobs:
           bash -xe ./build-test.sh
 
   linux-with-qt-and-system-lib:
-    name: "x86_64 Linux (Qt5 & system libs)"
+    name: x86_64 Linux, No GUI, system libs"
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
@@ -110,7 +129,7 @@ jobs:
       - run: |
           source ./default-env.sh
           HOST=x86_64-unknown-linux-gnu \
-          PACKAGES="python3-zmq qtbase5-dev qttools5-dev-tools libevent-dev bsdmainutils libboost-filesystem-dev  libboost-test-dev libdb5.3++-dev libminiupnpc-dev libzmq3-dev libqrencode-dev" \
+          PACKAGES="python3-zmq qtbase5-dev qttools5-dev-tools libevent-dev bsdmainutils libboost-test-dev libdb5.3++-dev libminiupnpc-dev libzmq3-dev libqrencode-dev" \
           NO_DEPENDS=1 \
           RUN_TESTS=true \
           RUN_BENCH=true \
@@ -146,12 +165,12 @@ jobs:
       - run: |
           source ./default-env.sh
           HOST=x86_64-apple-darwin \
-          PACKAGES="cmake imagemagick libcap-dev librsvg2-bin libz-dev libbz2-dev libtiff-tools python3-dev python3-setuptools xorriso libtinfo5 clang lld llvm g++ zip libqt5gui5 libqt5core5a qttools5-dev qttools5-dev-tools libqt5network5 libqt5widgets5" \
+          PACKAGES="cmake python3-dev python3-setuptools clang lld llvm g++ zip" \
           DEP_OPTS="LOG=1" \
           OSX_SDK=10.15 \
           GOAL="all deploy" \
           DEBUD_MODE=true \
-          BITCOIN_CONFIG="--with-gui=qt5 --enable-reduce-exports --enable-werror CPPFLAGS=-DDEBUG " \
+          BITCOIN_CONFIG="--with-gui=qt5 --enable-reduce-exports --enable-werror CPPFLAGS=-DDEBUG --with-qtdbus=no" \
           bash -xe ./build-test.sh
 
   cross-mac_release:
@@ -164,12 +183,12 @@ jobs:
       - run: |
           source ./default-env.sh
           HOST=x86_64-apple-darwin \
-          PACKAGES="cmake imagemagick libcap-dev librsvg2-bin libz-dev libbz2-dev libtiff-tools python3-dev python3-setuptools xorriso libtinfo5 clang lld llvm g++ zip libqt5gui5 libqt5core5a qttools5-dev qttools5-dev-tools libqt5network5 libqt5widgets5" \
+          PACKAGES="cmake python3-dev python3-setuptools clang lld llvm g++ zip" \
           DEP_OPTS="LOG=1" \
           OSX_SDK=10.15 \
           GOAL="all deploy" \
           DEBUD_MODE=false \
-          BITCOIN_CONFIG="--with-gui=qt5 --enable-reduce-exports --enable-werror" \
+          BITCOIN_CONFIG="--with-gui=qt5 --enable-reduce-exports --enable-werror --with-qtdbus=no" \
           bash -xe ./build-test.sh
 
   lint:

@@ -93,7 +93,19 @@ dnl Outputs: tapyrus_enable_qt, tapyrus_enable_qt_dbus, tapyrus_enable_qt_test
 AC_DEFUN([BITCOIN_QT_CONFIGURE],[
   qt_version=">= $1"
   qt_lib_prefix="Qt5"
-  BITCOIN_QT_CHECK([_BITCOIN_QT_FIND_LIBS])
+    if test x$qt_include_path = x; then
+      qt_include_path=${prefix}/include
+    fi
+    if test x$qt_lib_path = x; then
+      qt_lib_path=${prefix}/lib
+    fi
+
+    BITCOIN_QT_CHECK([
+      PKG_CONFIG_PATH="${qt_lib_path}/pkgconfig:$PKG_CONFIG_PATH"
+      PKG_CONFIG_PATH="${prefix}/lib/pkgconfig:$PKG_CONFIG_PATH"
+      export PKG_CONFIG_PATH
+      _BITCOIN_QT_FIND_LIBS
+    ])
 
   dnl This is ugly and complicated. Yuck. Works as follows:
   dnl For Qt5, we can check a header to find out whether Qt is build
@@ -239,10 +251,10 @@ AC_DEFUN([BITCOIN_QT_CONFIGURE],[
     if test x$use_dbus = xyes && test x$have_qt_dbus = xno; then
       AC_MSG_ERROR([libQtDBus not found. Install libQtDBus or remove --with-qtdbus.])
     fi
-    if test "x$LUPDATE" = x; then
+    if test x$LUPDATE = x; then
       AC_MSG_WARN([lupdate is required to update qt translations])
     fi
-    if test "$LCONVERT" = x; then
+    if test x$LCONVERT = x; then
       AC_MSG_WARN([lconvert tool is required to update Qt translations.])
     fi
   ],[
@@ -349,19 +361,39 @@ dnl Outputs: have_qt_test and have_qt_dbus are set (if applicable) to yes|no.
 AC_DEFUN([_BITCOIN_QT_FIND_LIBS],[
   BITCOIN_QT_CHECK([
     PKG_CHECK_MODULES([QT_CORE], [${qt_lib_prefix}Core${qt_lib_suffix} $qt_version], [QT_INCLUDES="$QT_CORE_CFLAGS $QT_INCLUDES" QT_LIBS="$QT_CORE_LIBS $QT_LIBS"],
-                      [BITCOIN_QT_FAIL([${qt_lib_prefix}Core${qt_lib_suffix} $qt_version not found])])
+                       [qt_lib_suffix=".a"
+                       QT_LIBS="-L$qt_lib_path $QT_LIBS"
+                       QT_INCLUDES="-I$qt_include_path -I$qt_include_path/QtCore $QT_INCLUDES"
+
+                       AC_CHECK_FILE([$qt_lib_path/lib${qt_lib_prefix}Core${qt_lib_suffix}],
+                         [QT_LIBS="$QT_LIBS -l${qt_lib_prefix}Core"],
+                         [BITCOIN_QT_FAIL([Static Qt5Core library not found])
+                       ])
+                      ])
   ])
   BITCOIN_QT_CHECK([
     PKG_CHECK_MODULES([QT_GUI], [${qt_lib_prefix}Gui${qt_lib_suffix} $qt_version], [QT_INCLUDES="$QT_GUI_CFLAGS $QT_INCLUDES" QT_LIBS="$QT_GUI_LIBS $QT_LIBS"],
-                      [BITCOIN_QT_FAIL([${qt_lib_prefix}Gui${qt_lib_suffix} $qt_version not found])])
+                      [AC_CHECK_FILE([$qt_lib_path/lib${qt_lib_prefix}Widgets${qt_lib_suffix}],
+                         [QT_LIBS="$QT_LIBS -l${qt_lib_prefix}Widgets"],
+                         [BITCOIN_QT_FAIL([Static Qt5Widgets library not found])
+                       ])
+                     ])
   ])
   BITCOIN_QT_CHECK([
     PKG_CHECK_MODULES([QT_WIDGETS], [${qt_lib_prefix}Widgets${qt_lib_suffix} $qt_version], [QT_INCLUDES="$QT_WIDGETS_CFLAGS $QT_INCLUDES" QT_LIBS="$QT_WIDGETS_LIBS $QT_LIBS"],
-                      [BITCOIN_QT_FAIL([${qt_lib_prefix}Widgets${qt_lib_suffix} $qt_version not found])])
+                      [AC_CHECK_FILE([$qt_lib_path/lib${qt_lib_prefix}Widgets${qt_lib_suffix}],
+                         [QT_LIBS="$QT_LIBS -l${qt_lib_prefix}Widgets"],
+                         [BITCOIN_QT_FAIL([Static Qt5Widgets library not found])
+                       ])
+                     ])
   ])
   BITCOIN_QT_CHECK([
     PKG_CHECK_MODULES([QT_NETWORK], [${qt_lib_prefix}Network${qt_lib_suffix} $qt_version], [QT_INCLUDES="$QT_NETWORK_CFLAGS $QT_INCLUDES" QT_LIBS="$QT_NETWORK_LIBS $QT_LIBS"],
-                      [BITCOIN_QT_FAIL([${qt_lib_prefix}Network${qt_lib_suffix} $qt_version not found])])
+                      [AC_CHECK_FILE([$qt_lib_path/lib${qt_lib_prefix}Network${qt_lib_suffix}],
+                         [QT_LIBS="$QT_LIBS -l${qt_lib_prefix}Network"],
+                         [BITCOIN_QT_FAIL([Static Qt5Network library not found])
+                      ])
+                     ])
   ])
 
   BITCOIN_QT_CHECK([
