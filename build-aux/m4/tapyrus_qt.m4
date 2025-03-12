@@ -361,19 +361,19 @@ dnl Outputs: have_qt_test and have_qt_dbus are set (if applicable) to yes|no.
 AC_DEFUN([_BITCOIN_QT_FIND_LIBS],[
   BITCOIN_QT_CHECK([
     PKG_CHECK_MODULES([QT_CORE], [${qt_lib_prefix}Core${qt_lib_suffix} $qt_version], [QT_INCLUDES="$QT_CORE_CFLAGS $QT_INCLUDES" QT_LIBS="$QT_CORE_LIBS $QT_LIBS"],
-                       [${qt_lib_prefix}Core${qt_lib_suffix} not found ])
+                       [${qt_lib_prefix}Core${qt_lib_suffix} $qt_version not found ])
   ])
   BITCOIN_QT_CHECK([
     PKG_CHECK_MODULES([QT_GUI], [${qt_lib_prefix}Gui${qt_lib_suffix} $qt_version], [QT_INCLUDES="$QT_GUI_CFLAGS $QT_INCLUDES" QT_LIBS="$QT_GUI_LIBS $QT_LIBS"],
-                      [${qt_lib_prefix}Gui${qt_lib_suffix not found ])
+                      [${qt_lib_prefix}Gui${qt_lib_suffix} $qt_version not found ])
   ])
   BITCOIN_QT_CHECK([
     PKG_CHECK_MODULES([QT_WIDGETS], [${qt_lib_prefix}Widgets${qt_lib_suffix} $qt_version], [QT_INCLUDES="$QT_WIDGETS_CFLAGS $QT_INCLUDES" QT_LIBS="$QT_WIDGETS_LIBS $QT_LIBS"],
-                      [${qt_lib_prefix}Widgets${qt_lib_suffix} not found ])
+                      [${qt_lib_prefix}Widgets${qt_lib_suffix} $qt_version not found ])
   ])
   BITCOIN_QT_CHECK([
     PKG_CHECK_MODULES([QT_NETWORK], [${qt_lib_prefix}Network${qt_lib_suffix} $qt_version], [QT_INCLUDES="$QT_NETWORK_CFLAGS $QT_INCLUDES" QT_LIBS="$QT_NETWORK_LIBS $QT_LIBS"],
-                      [${qt_lib_prefix}Network${qt_lib_suffix} not found ])
+                      [${qt_lib_prefix}Network${qt_lib_suffix} $qt_version not found ])
   ])
 
   BITCOIN_QT_CHECK([
