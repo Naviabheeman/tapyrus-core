@@ -14,6 +14,12 @@ AC_CONFIG_HEADERS([src/config/bitcoin-config.h])
 AC_CONFIG_AUX_DIR([build-aux])
 AC_CONFIG_MACRO_DIR([build-aux/m4])
 
+m4_ifndef([PKG_PROG_PKG_CONFIG], [m4_fatal([PKG_PROG_PKG_CONFIG macro not found. Please install pkg-config and re-run autogen.sh])])
+PKG_PROG_PKG_CONFIG
+if test "$PKG_CONFIG" = ""; then
+  AC_MSG_ERROR([pkg-config not found])
+fi
+
 BITCOIN_DAEMON_NAME=tapyrusd
 BITCOIN_GUI_NAME=tapyrus-qt
 BITCOIN_CLI_NAME=tapyrus-cli
@@ -426,12 +432,8 @@ if [ -z "$NO_DEPENDS" ]; then
   export PATH="${GITHUB_WORKSPACE}/depends/$HOST/bin:$PATH"
 fi
 
-use_pkgconfig=yes
 case $host in
   *mingw*)
-
-     #pkgconfig does more harm than good with MinGW
-     use_pkgconfig=no
 
      TARGET_OS=windows
      AC_CHECK_LIB([mingwthrd],      [main],, AC_MSG_ERROR(libmingwthrd missing))
@@ -599,15 +601,6 @@ case $host in
      ;;
 esac
 
-if test x$use_pkgconfig = xyes; then
-  m4_ifndef([PKG_PROG_PKG_CONFIG], [AC_MSG_ERROR(PKG_PROG_PKG_CONFIG macro not found. Please install pkg-config and re-run autogen.sh.)])
-  m4_ifdef([PKG_PROG_PKG_CONFIG], [
-  PKG_PROG_PKG_CONFIG
-  if test x"$PKG_CONFIG" = "x"; then
-    AC_MSG_ERROR(pkg-config not found.)
-  fi
-  ])
-fi
 
 if test x$use_extended_functional_tests != xno; then
   AC_SUBST(EXTENDED_FUNCTIONAL_TESTS, --extended)
@@ -917,7 +910,6 @@ else
     use_boost=yes
 fi
 
-
 if test "$use_reduce_exports" = "yes"; then
   AX_CHECK_COMPILE_FLAG([-fvisibility=hidden], [CXXFLAGS="$CXXFLAGS -fvisibility=hidden"],
   [AC_MSG_ERROR([Cannot set hidden symbol visibility. Use --disable-reduce-exports.])], [$CXXFLAG_WERROR])
@@ -926,7 +918,6 @@ if test "$use_reduce_exports" = "yes"; then
 fi
 
 if test x$use_tests = xyes; then
-
   if test x$HEXDUMP = x; then
     AC_MSG_ERROR(hexdump is required for tests)
   fi
@@ -950,73 +941,19 @@ if test x$use_boost = xyes; then
   AX_CHECK_PREPROC_FLAG([-DBOOST_NO_CXX98_FUNCTION_BASE], [BOOST_CPPFLAGS="$BOOST_CPPFLAGS -DBOOST_NO_CXX98_FUNCTION_BASE"], [], [$CXXFLAG_WERROR],
                         [AC_LANG_PROGRAM([[#include <boost/config.hpp>]])])
 
-  if test "x$suppress_external_warnings" != "xno"; then
+  if test x$suppress_external_warnings != xno; then
     BOOST_CPPFLAGS=SUPPRESS_WARNINGS($BOOST_CPPFLAGS)
   fi
 fi
 
-if test x$use_pkgconfig = xyes; then
-  : dnl
-  m4_ifdef(
-    [PKG_CHECK_MODULES],
-    [
-     if test x$use_qr != xno; then
-        BITCOIN_QT_CHECK([PKG_CHECK_MODULES([QR], [libqrencode], [have_qrencode=yes], [have_qrencode=no])])
-      fi
-      if test x$build_tapyrus_utils$build_tapyrusd$tapyrus_enable_qt$use_tests != xnononono; then
-        PKG_CHECK_MODULES([EVENT], [libevent],, [AC_MSG_ERROR(libevent not found.)])
-        if test x$TARGET_OS != xwindows; then
-          PKG_CHECK_MODULES([EVENT_PTHREADS], [libevent_pthreads],, [AC_MSG_ERROR(libevent_pthreads not found.)])
-        fi
-      fi
+if test x$use_qr != xno; then
+    BITCOIN_QT_CHECK([PKG_CHECK_MODULES([QR], [libqrencode], [have_qrencode=yes], [have_qrencode=no])])
+fi
 
-      if test x$use_zmq = xyes; then
-        PKG_CHECK_MODULES([ZMQ],[libzmq >= 4],
-          [AC_DEFINE([ENABLE_ZMQ],[1],[Define to 1 to enable ZMQ functions])],
-          [AC_DEFINE([ENABLE_ZMQ],[0],[Define to 1 to enable ZMQ functions])
-           AC_MSG_WARN([libzmq version 4.x or greater not found, disabling])
-           use_zmq=no])
-      else
-          AC_DEFINE_UNQUOTED([ENABLE_ZMQ],[0],[Define to 1 to enable ZMQ functions])
-      fi
-    ]
-  )
-else
-
-  if test x$build_tapyrus_utils$build_tapyrusd$tapyrus_enable_qt$use_tests != xnononono; then
-    AC_CHECK_HEADER([event2/event.h],, AC_MSG_ERROR(libevent headers missing),)
-    AC_CHECK_LIB([event],[main],EVENT_LIBS=-levent,AC_MSG_ERROR(libevent missing))
-    if test x$TARGET_OS != xwindows; then
-      AC_CHECK_LIB([event_pthreads],[main],EVENT_PTHREADS_LIBS=-levent_pthreads,AC_MSG_ERROR(libevent_pthreads missing))
-    fi
-  fi
-
-  if test x$use_zmq = xyes; then
-     AC_CHECK_HEADER([zmq.h],
-       [AC_DEFINE([ENABLE_ZMQ],[1],[Define to 1 to enable ZMQ functions])],
-       [AC_MSG_WARN([zmq.h not found, disabling zmq support])
-        use_zmq=no
-        AC_DEFINE([ENABLE_ZMQ],[0],[Define to 1 to enable ZMQ functions])])
-     AC_CHECK_LIB([zmq],[zmq_ctx_shutdown],ZMQ_LIBS=-lzmq,
-       [AC_MSG_WARN([libzmq >= 4.0 not found, disabling zmq support])
-        use_zmq=no
-        AC_DEFINE([ENABLE_ZMQ],[0],[Define to 1 to enable ZMQ functions])])
-  else
-    AC_DEFINE_UNQUOTED([ENABLE_ZMQ],[0],[Define to 1 to enable ZMQ functions])
-  fi
-
-  if test x$use_zmq = xyes; then
-    dnl Assume libzmq was built for static linking
-    case $host in
-      *mingw*)
-        ZMQ_CFLAGS="$ZMQ_CFLAGS -DZMQ_STATIC"
-      ;;
-    esac
-  fi
-
-  if test x$use_qr != xno; then
-    BITCOIN_QT_CHECK([AC_CHECK_LIB([qrencode], [main],[QR_LIBS=-lqrencode], [have_qrencode=no])])
-    BITCOIN_QT_CHECK([AC_CHECK_HEADER([qrencode.h],, have_qrencode=no)])
+if test x$build_tapyrus_utils$build_tapyrusd$tapyrus_enable_qt$use_tests != xnononono; then
+  PKG_CHECK_MODULES([EVENT], [libevent],, [AC_MSG_ERROR(libevent not found.)])
+  if test x$TARGET_OS != xwindows; then
+    PKG_CHECK_MODULES([EVENT_PTHREADS], [libevent_pthreads],, [AC_MSG_ERROR(libevent_pthreads not found)])
   fi
 fi
 
@@ -1059,6 +996,24 @@ if test x$system_univalue != xno ; then
 fi
 
 fi
+
+if test x$use_zmq = xyes; then
+  PKG_CHECK_MODULES([ZMQ], [libzmq >= 4],
+    AC_DEFINE([ENABLE_ZMQ], [1], [Define this symbol to enable ZMQ functions]),
+    [AC_MSG_WARN([libzmq version 4.x or greater not found, disabling])
+    use_zmq=no])
+fi
+
+if test x$use_zmq = xyes; then
+  dnl Assume libzmq was built for static linking
+  case $host in
+    *mingw*)
+      ZMQ_CFLAGS="$ZMQ_CFLAGS -DZMQ_STATIC"
+    ;;
+  esac
+fi
+
+AM_CONDITIONAL([ENABLE_ZMQ], [test x$use_zmq = xyes])
 
 AC_MSG_CHECKING([whether to build tapyrusd])
 AM_CONDITIONAL([BUILD_BITCOIND], [test x$build_tapyrusd = xyes])
@@ -1109,30 +1064,22 @@ fi
 
 dnl enable upnp support
 AC_MSG_CHECKING([whether to build with support for UPnP])
-if test x$have_miniupnpc = xno; then
-  if test x$use_upnp = xyes; then
-     AC_MSG_ERROR("UPnP requested but cannot be built. use --without-miniupnpc")
+if test "$have_miniupnpc" = "no"; then
+  if test "$use_upnp" = "yes"; then
+     AC_MSG_ERROR([UPnP requested but cannot be built. Use --without-miniupnpc])
   fi
+  AC_MSG_RESULT([no])
   use_upnp=no
-  AC_MSG_RESULT(no)
 else
-  if test x$use_upnp != xno; then
-    AC_MSG_RESULT(yes)
-    AC_MSG_CHECKING([whether to build with UPnP enabled by default])
+  if test "$use_upnp" != "no"; then
+    AC_MSG_RESULT([yes])
     use_upnp=yes
-    upnp_setting=0
-    if test x$use_upnp_default != xno; then
-      use_upnp_default=yes
-      upnp_setting=1
-    fi
-    AC_MSG_RESULT($use_upnp_default)
-    AC_DEFINE_UNQUOTED([USE_UPNP],[$upnp_setting],[UPnP support not compiled if undefined, otherwise value (0 or 1) determines default state])
-    if test x$TARGET_OS = xwindows; then
-      MINIUPNPC_CPPFLAGS="-DSTATICLIB -DMINIUPNP_STATICLIB"
+    AC_DEFINE([USE_UPNP], [1], [Define to 1 if UPnP support should be compiled in.])
+    if test "$TARGET_OS" = "windows"; then
+      MINIUPNPC_CPPFLAGS="$MINIUPNPC_CPPFLAGS -DMINIUPNP_STATICLIB"
     fi
   else
-    use_upnp=no
-    AC_MSG_RESULT(no)
+    AC_MSG_RESULT([no])
   fi
 fi
 
@@ -1173,8 +1120,6 @@ if test x$tapyrus_enable_qt != xno; then
     AC_MSG_RESULT([no])
   fi
 fi
-
-AM_CONDITIONAL([ENABLE_ZMQ], [test "x$use_zmq" = "xyes"])
 
 AC_MSG_CHECKING([whether to build test_tapyrus])
 if test x$use_tests = xyes; then
@@ -1265,6 +1210,7 @@ AC_SUBST(LEVELDB_TARGET_FLAGS)
 AC_SUBST(MINIUPNPC_CPPFLAGS)
 AC_SUBST(MINIUPNPC_LIBS)
 AC_SUBST(EVENT_LIBS)
+AC_SUBST(EVENT_PTHREADS_LIBS)
 AC_SUBST(EVENT_PTHREADS_LIBS)
 AC_SUBST(ZMQ_LIBS)
 AC_SUBST(QR_LIBS)

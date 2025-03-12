@@ -4,7 +4,7 @@ on: [push, pull_request]
 
 jobs:
   arm:
-    name: "ARM"
+    name: Linux ARM
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
@@ -20,7 +20,7 @@ jobs:
           bash -xe ./build-test.sh
 
   win64:
-    name: "WIN64"
+    name: WIN64
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
@@ -35,11 +35,9 @@ jobs:
           BITCOIN_CONFIG="--enable-reduce-exports" \
           bash -xe ./build-test.sh
 
-  build_x86_linux_no_gui_debug:
+  linux_x86_no_gui_debug:
     name: x86 Linux, No GUI, Debug
-
     runs-on: ubuntu-22.04
-
     steps:
       - uses: actions/checkout@v4
         with:
@@ -50,7 +48,6 @@ jobs:
           HOST=x86_64-unknown-linux-gnu \
           PACKAGES="python3-zmq libevent-dev bsdmainutils libboost-test-dev libdb5.3++-dev libminiupnpc-dev libzmq3-dev libqrencode-dev systemtap-sdt-dev bpfcc-tools bpftrace" \
           NO_DEPENDS=1 \
-          DEP_OPTS="NO_QT=1" \
           RUN_TESTS=false \
           RUN_BENCH=true \
           DEBUD_MODE=true \
@@ -58,11 +55,9 @@ jobs:
           BITCOIN_CONFIG="--enable-zmq --with-incompatible-bdb --enable-reduce-exports --with-gui=no --enable-debug CPPFLAGS=-DDEBUG CPPFLAGS=-DDEBUG_LOCKORDER" \
           bash -xe ./build-test.sh
 
-  build_x86_linux_no_gui_release:
+  linux_x86_no_gui_release:
     name: x86 Linux, No GUI, Release, USDT
-
     runs-on: ubuntu-22.04
-
     steps:
       - uses: actions/checkout@v4
         with:
@@ -73,7 +68,6 @@ jobs:
           HOST=x86_64-unknown-linux-gnu \
           PACKAGES="python3-zmq libevent-dev bsdmainutils libboost-test-dev libdb5.3++-dev libminiupnpc-dev libzmq3-dev libqrencode-dev systemtap-sdt-dev bpfcc-tools bpftrace" \
           NO_DEPENDS=1 \
-          DEP_OPTS="NO_QT=1" \
           RUN_TESTS=true \
           RUN_BENCH=true \
           DEBUD_MODE=false \
@@ -81,8 +75,8 @@ jobs:
           BITCOIN_CONFIG="--enable-zmq --with-incompatible-bdb --enable-reduce-exports --with-gui=no --enable-usdt CPPFLAGS=-DDEBUG_LOCKORDER" \
           bash -xe ./build-test.sh
 
-  build_x86_Linux_with_GUI_release:
-    name: x86_64 Linux, Qt5, Release
+  linux_x86_with_GUI_and_depends_release:
+    name: x86_64 Linux, only depends, Release
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
@@ -92,16 +86,16 @@ jobs:
           source ./default-env.sh
           HOST=x86_64-unknown-linux-gnu \
           PACKAGES="python3-zmq  bsdmainutils bpfcc-tools bpftrace" \
-          DEP_OPTS="LOG=1" \
+          DEP_OPTS="V=1" \
           RUN_TESTS=true \
           RUN_BENCH=true \
           GOAL="install" \
-          BITCOIN_CONFIG="--enable-zmq --with-gui=qt5 --enable-reduce-exports --enable-debug" \
+          BITCOIN_CONFIG="--enable-zmq --with-gui=qt5 --enable-reduce-exports" \
           CXXFLAGS="-g0 -O2" \
           bash -xe ./build-test.sh
 
-  linux-with-qt:
-    name: x86_64 Linux, qt5 dev, Release"
+  linux-x86_linux_qt5_release:
+    name: x86_64 Linux, qt5 dev, depends, Release"
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
@@ -111,16 +105,16 @@ jobs:
           source ./default-env.sh
           HOST=x86_64-unknown-linux-gnu \
           PACKAGES="python3-zmq qtbase5-dev qttools5-dev-tools qttools5-dev" \
-          DEP_OPTS="NO_UPNP=1" \
+          DEP_OPTS="NO_QT=1 V=1" \
           RUN_TESTS=true \
           RUN_BENCH=true \
           GOAL="install" \
-          BITCOIN_CONFIG="--enable-zmq --with-gui=qt5 --enable-reduce-exports --enable-debug" \
+          BITCOIN_CONFIG="--enable-zmq --with-gui=qt5 --enable-reduce-exports" \
           CXXFLAGS="-g0 -O2" \
           bash -xe ./build-test.sh
 
-  linux-with-qt-and-system-lib:
-    name: x86_64 Linux, No GUI, system libs"
+  linux_x86_with_only_system_lib:
+    name: x86_64 Linux, with GUI, system libs"
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
@@ -137,8 +131,8 @@ jobs:
           BITCOIN_CONFIG="--enable-zmq --with-incompatible-bdb --enable-reduce-exports --with-gui=qt5 CPPFLAGS=-DDEBUG_LOCKORDER" \
           bash -xe ./build-test.sh
 
-  linux-no-wallet:
-    name: "x86_64 Linux, No wallet"
+  linux_x86_no_wallet:
+    name: x86_64 Linux, No GUI, No wallet
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
@@ -155,7 +149,7 @@ jobs:
           BITCOIN_CONFIG="--enable-reduce-exports" \
           bash -xe ./build-test.sh
 
-  cross-mac_debug:
+  cross_mac_debug:
     name: Cross Mac Debug
     runs-on: ubuntu-22.04
     steps:
@@ -170,10 +164,10 @@ jobs:
           OSX_SDK=10.15 \
           GOAL="all deploy" \
           DEBUD_MODE=true \
-          BITCOIN_CONFIG="--with-gui=qt5 --enable-reduce-exports --enable-werror CPPFLAGS=-DDEBUG --with-qtdbus=no --with-qt-includedir=$PREFIX/include --with-qt-libdir=$PREFIX/lib" \
+          BITCOIN_CONFIG="--with-gui=qt5 --enable-reduce-exports --enable-werror --enable-debug CPPFLAGS=-DDEBUG --with-qtdbus=no --with-qt-includedir=$PREFIX/include --with-qt-libdir=$PREFIX/lib" \
           bash -xe ./build-test.sh
 
-  cross-mac_release:
+  cross_mac_release:
     name: Cross Mac Release
     runs-on: ubuntu-22.04
     steps:
@@ -193,9 +187,7 @@ jobs:
 
   lint:
     name: "[PARTIAL_PENDING]lint"
-
     runs-on: ubuntu-22.04
-
     steps:
       - uses: actions/checkout@v4
         with:
