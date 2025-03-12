@@ -170,7 +170,7 @@ jobs:
           OSX_SDK=10.15 \
           GOAL="all deploy" \
           DEBUD_MODE=true \
-          BITCOIN_CONFIG="--with-gui=qt5 --enable-reduce-exports --enable-werror CPPFLAGS=-DDEBUG --with-qtdbus=no" \
+          BITCOIN_CONFIG="--with-gui=qt5 --enable-reduce-exports --enable-werror CPPFLAGS=-DDEBUG --with-qtdbus=no --with-qt-includedir=$PREFIX/include --with-qt-libdir=$PREFIX/lib" \
           bash -xe ./build-test.sh
 
   cross-mac_release:
@@ -188,7 +188,7 @@ jobs:
           OSX_SDK=10.15 \
           GOAL="all deploy" \
           DEBUD_MODE=false \
-          BITCOIN_CONFIG="--with-gui=qt5 --enable-reduce-exports --enable-werror --with-qtdbus=no" \
+          BITCOIN_CONFIG="--with-gui=qt5 --enable-reduce-exports --enable-werror --with-qtdbus=no --with-qt-includedir=$PREFIX/include --with-qt-libdir=$PREFIX/lib" \
           bash -xe ./build-test.sh
 
   lint:
