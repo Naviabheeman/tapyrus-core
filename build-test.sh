@@ -31,7 +31,7 @@ if [ -z "$NO_DEPENDS" ]; then CONFIG_SHELL= make $MAKEJOBS -C depends HOST=$HOST
 # Script
 export COMMIT_LOG=`git log --format=fuller -1`
 OUTDIR=$BASE_OUTDIR/$GITHUB_SHA/$HOST
-BITCOIN_CONFIG_ALL="--disable-dependency-tracking --prefix=${GITHUB_WORKSPACE}/depends/$HOST --bindir=$OUTDIR/bin --libdir=$OUTDIR/lib"
+BITCOIN_CONFIG_ALL="--disable-dependency-tracking --prefix=${GITHUB_WORKSPACE}/depends/$HOST --bindir=$OUTDIR/bin --libdir=$OUTDIR/lib --with-qt-incdir=${GITHUB_WORKSPACE}/depends/$HOST/include --with-qt-libdir=${GITHUB_WORKSPACE}/depends/$HOST/lib"
 if [ -z "$NO_DEPENDS" ]; then ccache --max-size=$CCACHE_SIZE; fi
 test -n "$CONFIG_SHELL" && bash -c "$CONFIG_SHELL" -c "./autogen.sh" || ./autogen.sh
 mkdir build && cd build
