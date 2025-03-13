@@ -547,6 +547,7 @@ case $host in
        case $build_os in
          *darwin*)
            BUILD_OS=darwin
+           AC_PATH_TOOL([STRIP], [strip], [strip])
            ;;
          *)
            AC_PATH_TOOL([DSYMUTIL], [dsymutil], [dsymutil])
@@ -557,6 +558,11 @@ case $host in
            dnl which may not exist in the path. Stripping the .a is not
            dnl necessary, so just disable it.
            dnl old_striplib=
+           RANLIB=llvm-ranlib
+           STRIP=llvm-strip
+           if test ! -x "$(which $STRIP)"; then
+             AC_MSG_ERROR([$STRIP not found. Please ensure llvm tools are properly installed.])
+           fi
            ;;
        esac
      fi
