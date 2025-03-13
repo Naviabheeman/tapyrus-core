@@ -10,6 +10,10 @@ if [ -n "$DPKG_ADD_ARCH" ]; then sudo dpkg --add-architecture "$DPKG_ADD_ARCH" ;
 RETRY sudo apt-get update
 RETRY sudo apt-get install --no-install-recommends --no-upgrade -qq $PACKAGES $BUILD_PACKAGES linux-headers-generic
 
+if [ -n "$STRIP" ]; then
+    export STRIP
+fi
+
 # Before Script
 echo \> \$HOME/.tapyrus  # Make sure default datadir does not exist and is never read by creating a dummy file
 mkdir -p depends/SDKs depends/sdk-sources

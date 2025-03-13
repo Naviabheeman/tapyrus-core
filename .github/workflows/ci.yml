@@ -164,6 +164,7 @@ jobs:
           OSX_SDK=10.15 \
           GOAL="all deploy" \
           DEBUD_MODE=true \
+          STRIP="${PWD}/depends/x86_64-apple-darwin/native/bin/strip" \
           BITCOIN_CONFIG="--with-gui=qt5 --enable-reduce-exports --enable-werror --enable-debug CPPFLAGS=-DDEBUG --with-qtdbus=no" \
           bash -xe ./build-test.sh
 
@@ -182,6 +183,7 @@ jobs:
           OSX_SDK=10.15 \
           GOAL="all deploy" \
           DEBUD_MODE=false \
+          STRIP="${PWD}/depends/x86_64-apple-darwin/native/bin/strip" \
           BITCOIN_CONFIG="--with-gui=qt5 --enable-reduce-exports --enable-werror --with-qtdbus=no" \
           bash -xe ./build-test.sh
 
