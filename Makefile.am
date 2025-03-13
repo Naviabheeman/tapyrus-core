@@ -34,9 +34,6 @@ OSX_INSTALLER_ICONS=$(top_srcdir)/src/qt/res/icons/tapyrus.icns
 OSX_QT_TRANSLATIONS = da,de,es,hu,ru,uk,zh_CN,zh_TW
 OSX_PLIST=$(top_builddir)/share/qt/Info.plist #not installed
 
-STRIP ?= strip
-INSTALLNAMETOOL ?= install_name_tool
-OTOOL ?= otool
 
 DIST_DOCS = $(wildcard doc/*.md) $(wildcard doc/release-notes/*.md)
 DIST_CONTRIB = $(top_srcdir)/contrib/tapyrus-cli.bash-completion \
