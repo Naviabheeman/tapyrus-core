@@ -94,10 +94,10 @@ AC_DEFUN([BITCOIN_QT_CONFIGURE],[
   qt_version=">= $1"
   qt_lib_prefix="Qt5"
     if test x$qt_include_path = x; then
-      qt_include_path=${prefix}/include
+      qt_include_path="${prefix}/include"
     fi
     if test x$qt_lib_path = x; then
-      qt_lib_path=${prefix}/lib
+      qt_lib_path="${prefix}/lib"
     fi
 
     BITCOIN_QT_CHECK([

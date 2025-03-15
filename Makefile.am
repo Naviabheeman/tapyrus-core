@@ -109,7 +109,7 @@ OSX_APP_BUILT=$(OSX_APP)/Contents/PkgInfo $(OSX_APP)/Contents/Resources/empty.lp
 
 if BUILD_DARWIN
 $(OSX_ZIP): $(OSX_APP_BUILT) $(OSX_PACKAGING)
-	$(PYTHON) $(OSX_DEPLOY_SCRIPT) $(OSX_APP) $(OSX_VOLNAME) -translations-dir=$(QT_TRANSLATION_DIR) -zip
+	STRIP=$(STRIP) $(PYTHON) $(OSX_DEPLOY_SCRIPT) $(OSX_APP) $(OSX_VOLNAME) -translations-dir=$(QT_TRANSLATION_DIR) -zip
 
 deploydir: $(OSX_ZIP)
 
@@ -122,7 +122,7 @@ $(OSX_ZIP): deploydir
 	cd $(APP_DIST_DIR) && find . | sort | $(ZIP) -X@ $@
 
 $(APP_DIST_DIR)/$(OSX_APP)/Contents/MacOS/Tapyrus-Qt: $(OSX_APP_BUILT) $(OSX_PACKAGING)
-	$(OBJDUMP) $(PYTHON) $(OSX_DEPLOY_SCRIPT) $(OSX_APP) $(OSX_VOLNAME) -translations-dir=$(QT_TRANSLATION_DIR)
+	OBJDUMP=$(OBJDUMP) $(PYTHON) $(OSX_DEPLOY_SCRIPT) $(OSX_APP) $(OSX_VOLNAME) -translations-dir=$(QT_TRANSLATION_DIR)
 
 deploydir: $(APP_DIST_DIR)/$(OSX_APP)/Contents/MacOS/Tapyrus-Qt
 endif !BUILD_DARWIN

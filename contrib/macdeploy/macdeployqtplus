@@ -210,6 +210,39 @@ def getFrameworks(binaryPath: str, verbose: int) -> list[FrameworkInfo]:
 
 def runInstallNameTool(action: str, *args):
     installnametoolbin=os.getenv("INSTALL_NAME_TOOL", "install_name_tool")
+
+    print(f"DEBUG: Using install_name_tool: {installnametoolbin}")
+    print(f"DEBUG: PATH environment: {os.environ.get('PATH', 'Not set')}")
+    print(f"DEBUG: Checking if tool exists...")
+
+    # Check if the tool exists in PATH
+    import shutil
+    tool_path = shutil.which(installnametoolbin)
+    print(f"DEBUG: Tool path: {tool_path}")
+
+    if tool_path is None:
+        # Try to find alternatives
+        alternatives = ["install_name_tool", "x86_64-apple-darwin-install_name_tool"]
+        for alt in alternatives:
+            alt_path = shutil.which(alt)
+            print(f"DEBUG: Checking alternative {alt}: {alt_path}")
+            if alt_path is not None:
+                print(f"DEBUG: Using alternative tool: {alt}")
+                installnametoolbin = alt
+                break
+
+
+    if shutil.which(installnametoolbin) is None:
+        # Try alternatives if the specified tool doesn't exist
+        alternatives = ["install_name_tool", "llvm-install-name-tool", "llvm-objcopy", "x86_64-apple-darwin-objcopy"]
+        for tool in alternatives:
+            if shutil.which(tool) is not None:
+                print(f"Warning: {installnametoolbin} not found, using {tool} instead")
+                installnametoolbin = tool
+                break
+        else:
+            raise FileNotFoundError(f"Could not find install_name_tool or alternatives. Tried: {installnametoolbin}, {alternatives}")
+
     run([installnametoolbin, "-"+action] + list(args), check=True)
 
 def changeInstallName(oldName: str, newName: str, binaryPath: str, verbose: int):
@@ -288,25 +321,29 @@ def copyFramework(framework: FrameworkInfo, path: str, verbose: int) -> Optional
 def deployFrameworks(frameworks: list[FrameworkInfo], bundlePath: str, binaryPath: str, strip: bool, verbose: int, deploymentInfo: Optional[DeploymentInfo] = None) -> DeploymentInfo:
     if deploymentInfo is None:
         deploymentInfo = DeploymentInfo()
-
+    print("LIST BEGIN")
+    [print(str(x)) for x in frameworks]
+    print("LIST END")
     while len(frameworks) > 0:
         framework = frameworks.pop(0)
         deploymentInfo.deployedFrameworks.append(framework.frameworkName)
 
-        print("Processing", framework.frameworkName, "...")
+        print("Processin g", framework.frameworkName, "...")
 
         # Get the Qt path from one of the Qt frameworks
         if deploymentInfo.qtPath is None and framework.isQtFramework():
             deploymentInfo.detectQtPath(framework.frameworkDirectory)
 
+        print(framework.installName)
         if framework.installName.startswith("@executable_path") or framework.installName.startswith(bundlePath):
             print(framework.frameworkName, "already deployed, skipping.")
             continue
 
         # install_name_tool the new id into the binary
+        print(framework.deployedInstallName, binaryPath)
         changeInstallName(framework.installName, framework.deployedInstallName, binaryPath, verbose)
 
-        # Copy framework to app bundle.
+        print(" Copy framework to app bundle.")
         deployedBinaryPath = copyFramework(framework, bundlePath, verbose)
         # Skip the rest if already was deployed.
         if deployedBinaryPath is None:
