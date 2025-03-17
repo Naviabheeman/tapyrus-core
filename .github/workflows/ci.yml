@@ -168,7 +168,6 @@ jobs:
           bash -xe ./build-test.sh
 
   cross_mac_release:
-
     name: Cross Mac Release
     runs-on: ubuntu-22.04
     steps:
