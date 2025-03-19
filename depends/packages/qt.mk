@@ -261,7 +261,7 @@ endef
 
 define $(package)_config_cmds
   cd qtbase && \
-  ./configure  -top-level $($(package)_config_opts) || cat config.log
+  ./configure  -top-level $($(package)_config_opts)
 endef
 
 define $(package)_build_cmds
