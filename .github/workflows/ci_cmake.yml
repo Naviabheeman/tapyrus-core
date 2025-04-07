@@ -16,6 +16,7 @@ env:
   CI_FAILFAST_TEST_LEAVE_DANGLING: 1
   CTEST_OUTPUT_ON_FAILURE: ON
   CMAKE_BUILD_PARALLEL_LEVEL: 4
+  BUILD_TYPE: RelWithDebInfo
 
 jobs:
   linux:
@@ -56,7 +57,7 @@ jobs:
 
       - name: Compile and run tests
         run: |
-          CC=clang CXX=clang++ cmake -B build -DWERROR=ON -DWITH_ZMQ=ON -DBUILD_GUI=ON -DBUILD_BENCH=ON -DBUILD_FUZZ_BINARY=ON -DWITH_BDB=ON -DWITH_USDT=ON -DCMAKE_CXX_FLAGS='-Wno-error=unused-member-function'
+          CC=clang CXX=clang++ cmake -B build -DCMAKE_BUILD_TYPE=$BUILD_TYPE -DWERROR=ON -DWITH_ZMQ=ON -DBUILD_GUI=ON -DBUILD_BENCH=ON -DBUILD_FUZZ_BINARY=ON -DWITH_BDB=ON -DWITH_USDT=ON -DCMAKE_CXX_FLAGS='-Wno-error=unused-member-function'
           cmake --build build -j $(nproc)
           export CTEST_OUTPUT_ON_FAILURE=ON
           echo "---------------- Build unit test ---------------- "
@@ -153,7 +154,7 @@ jobs:
         run: |
           CPU_COUNT=$(sysctl -n hw.ncpu)
           BITCOIN_CONFIG_ALL="$BITCOIN_CONFIG_ALL -DCMAKE_INSTALL_PREFIX=$BASE_OUTDIR"
-          cmake -S "$BASE_ROOT_DIR" -B "$BASE_BUILD_DIR" ${BITCOIN_CONFIG_ALL} ${BITCOIN_CONFIG}
+          cmake -S "$BASE_ROOT_DIR" -B "$BASE_BUILD_DIR" -DCMAKE_BUILD_TYPE=$BUILD_TYPE ${BITCOIN_CONFIG_ALL} ${BITCOIN_CONFIG}
           cmake --build build --parallel -j "$CPU_COUNT" --target all
           export LD_LIBRARY_PATH="${DEPENDS_DIR}/${HOST}/lib"
           export CTEST_OUTPUT_ON_FAILURE=ON
