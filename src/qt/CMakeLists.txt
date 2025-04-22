@@ -49,21 +49,21 @@ qt5_add_translation(qm_files ${ts_files})
 
 configure_file(tapyrus_locale.qrc tapyrus_locale.qrc USE_SOURCE_PERMISSIONS COPYONLY)
 
-# The bitcoinqt sources have to include headers in
+# The tapyrusqt sources have to include headers in
 # order to parse them to collect translatable strings.
-add_library(bitcoinqt STATIC EXCLUDE_FROM_ALL
+add_library(tapyrusqt STATIC EXCLUDE_FROM_ALL
   bantablemodel.cpp
   bantablemodel.h
-  bitcoin.cpp
-  bitcoin.h
-  bitcoinaddressvalidator.cpp
-  bitcoinaddressvalidator.h
-  bitcoinamountfield.cpp
-  bitcoinamountfield.h
-  bitcoingui.cpp
-  bitcoingui.h
-  bitcoinunits.cpp
-  bitcoinunits.h
+  tapyrus.cpp
+  tapyrus.h
+  tapyrusaddressvalidator.cpp
+  tapyrusaddressvalidator.h
+  tapyrusamountfield.cpp
+  tapyrusamountfield.h
+  tapyrusgui.cpp
+  tapyrusgui.h
+  tapyrusunits.cpp
+  tapyrusunits.h
   clientmodel.cpp
   clientmodel.h
   csvmodelwriter.cpp
@@ -110,15 +110,15 @@ add_library(bitcoinqt STATIC EXCLUDE_FROM_ALL
   utilitydialog.h
   $<$<PLATFORM_ID:Windows>:winshutdownmonitor.cpp>
   $<$<PLATFORM_ID:Windows>:winshutdownmonitor.h>
-  bitcoin.qrc
+  tapyrus.qrc
   ${CMAKE_CURRENT_BINARY_DIR}/tapyrus_locale.qrc
 )
-target_compile_definitions(bitcoinqt
+target_compile_definitions(tapyrusqt
   PUBLIC
     QT_NO_KEYWORDS
     QT_USE_QSTRINGBUILDER
 )
-target_include_directories(bitcoinqt
+target_include_directories(tapyrusqt
   PUBLIC
     $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/src>
 )
@@ -126,7 +126,7 @@ set_property(SOURCE macnotificationhandler.mm
   # Ignore warnings "'NSUserNotificationCenter' is deprecated: first deprecated in macOS 11.0".
   APPEND PROPERTY COMPILE_OPTIONS -Wno-deprecated-declarations
 )
-target_link_libraries(bitcoinqt
+target_link_libraries(tapyrusqt
   PUBLIC
     Qt5::Widgets
   PRIVATE
@@ -140,7 +140,7 @@ target_link_libraries(bitcoinqt
 )
 
 if(ENABLE_WALLET)
-  target_sources(bitcoinqt
+  target_sources(tapyrusqt
     PRIVATE
       addressbookpage.cpp
       addressbookpage.h
@@ -203,7 +203,7 @@ if(ENABLE_WALLET)
       walletview.cpp
       walletview.h
   )
-  target_link_libraries(bitcoinqt
+  target_link_libraries(tapyrusqt
     PRIVATE
       tapyrus_wallet
       Qt5::Network
@@ -211,52 +211,35 @@ if(ENABLE_WALLET)
 endif()
 
 if(WITH_DBUS)
-  target_link_libraries(bitcoinqt PRIVATE Qt5::DBus)
+  target_link_libraries(tapyrusqt PRIVATE Qt5::DBus)
 endif()
 
 if(qt_lib_type STREQUAL "STATIC_LIBRARY")
   # We want to define static plugins to link ourselves, thus preventing
   # automatic linking against a "sane" set of default static plugins.
-  qt5_import_plugins(bitcoinqt
+  qt5_import_plugins(tapyrusqt
       EXCLUDE_BY_TYPE bearer iconengines imageformats platforms styles
   )
 endif()
 
-add_executable(bitcoin-qt
-  ../init/bitcoin-qt.cpp
+add_executable(tapyrus-qt
+  ../init/tapyrus-qt.cpp
 )
 
-add_windows_resources(bitcoin-qt res/bitcoin-qt-res.rc)
+add_windows_resources(tapyrus-qt res/tapyrus-qt-res.rc)
 
-target_link_libraries(bitcoin-qt
+target_link_libraries(tapyrus-qt
   core_interface
-  bitcoinqt
+  tapyrusqt
   tapyrus_node
 )
 
-import_plugins(bitcoin-qt)
-install_binary_component(bitcoin-qt HAS_MANPAGE)
+import_plugins(tapyrus-qt)
+install_binary_component(tapyrus-qt HAS_MANPAGE)
 if(WIN32)
-  set_target_properties(bitcoin-qt PROPERTIES WIN32_EXECUTABLE TRUE)
+  set_target_properties(tapyrus-qt PROPERTIES WIN32_EXECUTABLE TRUE)
 endif()
 
-if(WITH_MULTIPROCESS)
-  add_executable(bitcoin-gui
-    main.cpp
-    ../init/bitcoin-gui.cpp
-  )
-  target_link_libraries(bitcoin-gui
-    core_interface
-    bitcoinqt
-    tapyrus_node
-    tapyrus_ipc
-  )
-  import_plugins(bitcoin-gui)
-  install_binary_component(bitcoin-gui)
-  if(WIN32)
-    set_target_properties(bitcoin-gui PROPERTIES WIN32_EXECUTABLE TRUE)
-  endif()
-endif()
 
 if(BUILD_GUI_TESTS)
   add_subdirectory(test)
@@ -320,7 +303,7 @@ else()
   file(GLOB ui_files ${CMAKE_CURRENT_SOURCE_DIR}/forms/*.ui)
   add_custom_target(translate
     COMMAND ${CMAKE_COMMAND} -E env XGETTEXT=${XGETTEXT_EXECUTABLE} COPYRIGHT_HOLDERS=${COPYRIGHT_HOLDERS} ${Python3_EXECUTABLE} ${PROJECT_SOURCE_DIR}/share/qt/extract_strings_qt.py ${translatable_sources}
-    COMMAND Qt5::lupdate -no-obsolete -I ${PROJECT_SOURCE_DIR}/src -locations relative ${CMAKE_CURRENT_SOURCE_DIR}/bitcoinstrings.cpp ${ui_files} ${qt_translatable_sources} -ts ${CMAKE_CURRENT_SOURCE_DIR}/locale/tapyrus_en.ts
+    COMMAND Qt5::lupdate -no-obsolete -I ${PROJECT_SOURCE_DIR}/src -locations relative ${CMAKE_CURRENT_SOURCE_DIR}/tapyrusstrings.cpp ${ui_files} ${qt_translatable_sources} -ts ${CMAKE_CURRENT_SOURCE_DIR}/locale/tapyrus_en.ts
     COMMAND Qt5::lconvert -drop-translations -o ${CMAKE_CURRENT_SOURCE_DIR}/locale/tapyrus_en.xlf -i ${CMAKE_CURRENT_SOURCE_DIR}/locale/tapyrus_en.ts
     COMMAND ${SED_EXECUTABLE} -i.old -e "s|source-language=\"en\" target-language=\"en\"|source-language=\"en\"|" -e "/<target xml:space=\"preserve\"><\\/target>/d" ${CMAKE_CURRENT_SOURCE_DIR}/locale/tapyrus_en.xlf
     COMMAND ${CMAKE_COMMAND} -E rm ${CMAKE_CURRENT_SOURCE_DIR}/locale/tapyrus_en.xlf.old

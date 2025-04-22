@@ -93,9 +93,7 @@ target_link_libraries(tapyrus_clientversion
 add_dependencies(tapyrus_clientversion generate_build_info)
 
 add_subdirectory(crypto)
-if(WITH_MULTIPROCESS)
-  add_subdirectory(ipc)
-endif()
+
 
 add_library(tapyrus_consensus STATIC EXCLUDE_FROM_ALL
   arith_uint256.cpp
@@ -244,35 +242,6 @@ if(BUILD_DAEMON)
   )
   install_binary_component(tapyrusd HAS_MANPAGE)
 endif()
-if(WITH_MULTIPROCESS AND BUILD_DAEMON)
-  add_executable(tapyrus-node
-    tapyrusd.cpp
-    init/tapyrus-node.cpp
-  )
-  target_link_libraries(tapyrus-node
-    core_interface
-    tapyrus_node
-    tapyrus_ipc
-    $<TARGET_NAME_IF_EXISTS:tapyrus_wallet>
-  )
-  install_binary_component(tapyrus-node)
-endif()
-
-if(WITH_MULTIPROCESS AND BUILD_TESTS)
-    # tapyrus_ipc_test library target is defined here in src/CMakeLists.txt
-    # instead of src/test/CMakeLists.txt so capnp files in src/test/ are able to
-    # reference capnp files in src/ipc/capnp/ by relative path. The Cap'n Proto
-    # compiler only allows importing by relative path when the importing and
-    # imported files are underneath the same compilation source prefix, so the
-    # source prefix must be src/, not src/test/
-    add_library(tapyrus_ipc_test STATIC EXCLUDE_FROM_ALL
-      test/ipc_test.cpp
-    )
-    target_capnp_sources(tapyrus_ipc_test ${PROJECT_SOURCE_DIR}
-      test/ipc_test.capnp
-    )
-    add_dependencies(tapyrus_ipc_test tapyrus_ipc_headers)
-endif()
 
 
 add_library(tapyrus_cli STATIC EXCLUDE_FROM_ALL
@@ -318,10 +287,6 @@ if(BUILD_GUI)
   add_subdirectory(qt)
 endif()
 
-
-if(BUILD_KERNEL_LIB)
-  add_subdirectory(kernel)
-endif()
 
 if(BUILD_UTIL_CHAINSTATE)
   add_executable(tapyrus-chainstate
