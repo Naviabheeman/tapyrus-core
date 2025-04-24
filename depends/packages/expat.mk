@@ -11,12 +11,23 @@ define $(package)_set_vars
   $(package)_config_opts=--disable-shared --without-docbook --without-tests --without-examples
   $(package)_config_opts += --disable-dependency-tracking --enable-option-checking
   $(package)_config_opts += --without-xmlwf
-  $(package)_config_opts_linux=--with-pic
   $(package)_cppflags += -D_DEFAULT_SOURCE
+  $(package)_cmake_opts := -DCMAKE_BUILD_TYPE=None -DEXPAT_BUILD_TOOLS=OFF
+  $(package)_cmake_opts += -DEXPAT_BUILD_EXAMPLES=OFF -DEXPAT_BUILD_TESTS=OFF
+  $(package)_cmake_opts += -DBUILD_SHARED_LIBS=OFF
+  $(package)_cppflags += -D_DEFAULT_SOURCE
+endef
+
+define $(package)_preprocess_cmds
+  patch -p1 < $($(package)_patch_dir)/cmake_minimum.patch
 endef
 
 define $(package)_config_cmds
   $($(package)_autoconf)
+endef
+
+define $(package)_cmake_config_cmds
+  $($(package)_cmake) -S .. -B .
 endef
 
 define $(package)_build_cmds

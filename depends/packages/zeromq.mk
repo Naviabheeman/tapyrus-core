@@ -18,8 +18,13 @@ define $(package)_set_vars
   $(package)_config_opts += --without-libsodium --without-libgssapi_krb5 --without-pgm --without-norm --without-vmci
   $(package)_config_opts += --disable-libunwind --disable-radix-tree --without-gcov --disable-dependency-tracking
   $(package)_config_opts += --disable-Werror --disable-drafts --enable-option-checking
-  $(package)_config_opts_linux=--with-pic
   $(package)_cxxflags=-std=c++17
+  $(package)_cmake_opts := -DCMAKE_BUILD_TYPE=None -DWITH_DOCS=OFF -DWITH_LIBSODIUM=OFF
+  $(package)_cmake_opts += -DWITH_LIBBSD=OFF -DENABLE_CURVE=OFF -DENABLE_CPACK=OFF
+  $(package)_cmake_opts += -DBUILD_SHARED=OFF -DBUILD_TESTS=OFF -DZMQ_BUILD_TESTS=OFF
+  $(package)_cmake_opts += -DENABLE_DRAFTS=OFF -DZMQ_BUILD_TESTS=OFF
+  $(package)_cxxflags += -fdebug-prefix-map=$($(package)_extract_dir)=/usr -fmacro-prefix-map=$($(package)_extract_dir)=/usr
+  $(package)_config_opts_mingw32 += -DZMQ_WIN32_WINNT=0x0A00 -DZMQ_HAVE_IPC=OFF
 endef
 
 define $(package)_preprocess_cmds
@@ -35,6 +40,10 @@ endef
 
 define $(package)_config_cmds
   $($(package)_config_env) ./configure $($(package)_config_opts)
+endef
+
+define $(package)_cmake_config_cmds
+   $($(package)_cmake) -S .. -B .
 endef
 
 define $(package)_build_cmds

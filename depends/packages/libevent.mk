@@ -11,12 +11,13 @@ define $(package)_set_vars
   $(package)_config_opts=--disable-shared --disable-openssl --disable-libevent-regress --disable-samples
   $(package)_config_opts += --disable-dependency-tracking --enable-option-checking
   $(package)_config_opts_release=--disable-debug-mode
-  $(package)_config_opts_linux=--with-pic
   $(package)_cppflags_mingw32=-D_WIN32_WINNT=0x0601
 
-  ifeq ($(NO_HARDEN),)
-  $(package)_cppflags+=-D_FORTIFY_SOURCE=3
-  endif
+  $(package)_cmake_opts=-DCMAKE_BUILD_TYPE=None -DEVENT__DISABLE_BENCHMARK=ON -DEVENT__DISABLE_OPENSSL=ON
+  $(package)_cmake_opts+=-DEVENT__DISABLE_SAMPLES=ON -DEVENT__DISABLE_REGRESS=ON
+  $(package)_cmake_opts+=-DEVENT__DISABLE_TESTS=ON -DEVENT__LIBRARY_TYPE=STATIC
+  $(package)_cflags += -fdebug-prefix-map=$($(package)_extract_dir)=/usr -fmacro-prefix-map=$($(package)_extract_dir)=/usr
+  $(package)_cppflags += -D_GNU_SOURCE -D_FORTIFY_SOURCE=3
 endef
 
 define $(package)_preprocess_cmds
@@ -25,6 +26,10 @@ endef
 
 define $(package)_config_cmds
   $($(package)_autoconf)
+endef
+
+define $(package)_cmake_config_cmds
+  $($(package)_cmake) -S .. -B .
 endef
 
 define $(package)_build_cmds

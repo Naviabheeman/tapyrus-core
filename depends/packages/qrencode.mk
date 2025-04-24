@@ -8,8 +8,10 @@ define $(package)_set_vars
 $(package)_config_opts=--disable-shared --without-tools --without-tests --without-png
 $(package)_config_opts += --disable-gprof --disable-gcov --disable-mudflap
 $(package)_config_opts += --disable-dependency-tracking --enable-option-checking
-$(package)_config_opts_linux=--with-pic
 $(package)_cflags += -Wno-int-conversion -Wno-implicit-function-declaration
+$(package)_cmake_opts := -DWITH_TOOLS=NO -DWITH_TESTS=NO -DGPROF=OFF -DCOVERAGE=OFF
+$(package)_cmake_opts += -DCMAKE_DISABLE_FIND_PACKAGE_PNG=TRUE -DWITHOUT_PNG=ON
+$(package)_cmake_opts += -DCMAKE_DISABLE_FIND_PACKAGE_ICONV=TRUE
 endef
 
 define $(package)_preprocess_cmds
@@ -18,6 +20,10 @@ endef
 
 define $(package)_config_cmds
   $($(package)_autoconf)
+endef
+
+define $(package)_config_cmds
+  $($(package)_cmake) -S . -B .
 endef
 
 define $(package)_build_cmds
