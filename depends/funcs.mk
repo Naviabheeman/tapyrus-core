@@ -88,6 +88,7 @@ $(1)_extract_cmds ?= mkdir -p $$($(1)_extract_dir) && echo "$$($(1)_sha256_hash)
 $(1)_preprocess_cmds ?= true
 $(1)_build_cmds ?= true
 $(1)_config_cmds ?= true
+$(1)_cmake_config_cmds ?= true
 $(1)_stage_cmds ?= true
 $(1)_set_vars ?=
 
@@ -139,6 +140,24 @@ $(1)_config_env+=PKG_CONFIG_PATH=$($($(1)_type)_prefix)/share/pkgconfig
 $(1)_config_env+=PKG_CONFIG_SYSROOT_DIR=/
 $(1)_config_env+=CMAKE_MODULE_PATH=$($($(1)_type)_prefix)/lib/cmake
 $(1)_config_env+=PATH=$(build_prefix)/bin:$(PATH)
+$(1)_build_env+=PATH=$(build_prefix)/bin:$(PATH)
+$(1)_stage_env+=PATH=$(build_prefix)/bin:$(PATH)
+
+$(1)_cmake_opts+=$$($(1)_cmake_opts_$(release_type))
+$(1)_cmake_opts+=$$($(1)_cmake_opts_$(host_arch)) $$($(1)_cmake_opts_$(host_arch)_$(release_type))
+$(1)_cmake_opts+=$$($(1)_cmake_opts_$(host_os)) $$($(1)_cmake_opts_$(host_os)_$(release_type))
+$(1)_cmake_opts+=$$($(1)_cmake_opts_$(host_arch)_$(host_os)) $$($(1)_cmake_opts_$(host_arch)_$(host_os)_$(release_type))
+
+$(1)_cmake_env+=$$($(1)_cmake_env_$(release_type))
+$(1)_cmake_env+=$($(1)_cmake_env_$(host_arch)) $($(1)_cmake_env_$(host_arch)_$(release_type))
+$(1)_cmake_env+=$($(1)_cmake_env_$(host_os)) $($(1)_cmake_env_$(host_os)_$(release_type))
+$(1)_cmake_env+=$($(1)_cmake_env_$(host_arch)_$(host_os)) $($(1)_cmake_env_$(host_arch)_$(host_os)_$(release_type))
+
+$(1)_cmake_env+=PKG_CONFIG_LIBDIR=$($($(1)_type)_prefix)/lib/pkgconfig
+$(1)_cmake_env+=PKG_CONFIG_PATH=$($($(1)_type)_prefix)/share/pkgconfig
+$(1)_cmake_env+=PKG_CONFIG_SYSROOT_DIR=/
+$(1)_cmake_env+=CMAKE_MODULE_PATH=$($($(1)_type)_prefix)/lib/cmake
+$(1)_cmake_env+=PATH=$(build_prefix)/bin:$(PATH)
 $(1)_build_env+=PATH=$(build_prefix)/bin:$(PATH)
 $(1)_stage_env+=PATH=$(build_prefix)/bin:$(PATH)
 
@@ -224,10 +243,14 @@ $($(1)_preprocessed): | $($(1)_extracted)
 	touch $$@
 $($(1)_configured): | $($(1)_dependencies) $($(1)_preprocessed)
 	echo Configuring $(1)...
+	$(info $(1)_cmake_config_cmds: $($(1)_cmake_config_cmds) )
 	rm -rf $(host_prefix); mkdir -p $(host_prefix)/lib; cd $(host_prefix); $(foreach package,$($(1)_all_dependencies), tar --no-same-owner -x -f $($(package)_cached); )
 	mkdir -p $$($(1)_build_dir)
 	+{ cd $$($(1)_build_dir); export $($(1)_config_env); $($(1)_config_cmds); } $$($(1)_logging)
+ifneq ($(strip $($(1)_cmake_config_cmds)),true)
+	echo Configuring $(1) using cmake...
 	+{ cd $$($(1)_build_dir); export $($(1)_cmake_env); $($(1)_cmake_config_cmds); } $$($(1)_logging)
+endif
 	touch $$@
 $($(1)_built): | $($(1)_configured)
 	echo Building $(1)...

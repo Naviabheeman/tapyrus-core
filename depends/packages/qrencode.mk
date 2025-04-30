@@ -22,18 +22,19 @@ define $(package)_config_cmds
   $($(package)_autoconf)
 endef
 
-define $(package)_config_cmds
-  $($(package)_cmake) -S . -B .
+define $(package)_cmake_config_cmds
+  mkdir -p cmake_build && \
+  $($(package)_cmake) -S $($(package)_extract_dir) -B cmake_build $($(package)_cmake_opts)
 endef
 
 define $(package)_build_cmds
-  $(MAKE)
+  $(MAKE) -C cmake_build
 endef
 
 define $(package)_stage_cmds
-  $(MAKE) DESTDIR=$($(package)_staging_dir) install
+  $(MAKE) -C cmake_build DESTDIR=$($(package)_staging_dir) install
 endef
 
 define $(package)_postprocess_cmds
-  rm lib/*.la
+  if [ -f lib/*.la ]; then rm lib/*.la; fi
 endef

@@ -13,6 +13,7 @@ define $(package)_set_vars
   $(package)_config_opts_release=--disable-debug-mode
   $(package)_cppflags_mingw32=-D_WIN32_WINNT=0x0601
 
+  # CMake configuration options
   $(package)_cmake_opts=-DCMAKE_BUILD_TYPE=None -DEVENT__DISABLE_BENCHMARK=ON -DEVENT__DISABLE_OPENSSL=ON
   $(package)_cmake_opts+=-DEVENT__DISABLE_SAMPLES=ON -DEVENT__DISABLE_REGRESS=ON
   $(package)_cmake_opts+=-DEVENT__DISABLE_TESTS=ON -DEVENT__LIBRARY_TYPE=STATIC
@@ -29,19 +30,20 @@ define $(package)_config_cmds
 endef
 
 define $(package)_cmake_config_cmds
-  $($(package)_cmake) -S .. -B .
+  mkdir -p cmake_build && \
+  $($(package)_cmake) -S $($(package)_extract_dir) -B cmake_build $($(package)_cmake_opts)
 endef
 
 define $(package)_build_cmds
-  $(MAKE)
+  $(MAKE) -C cmake_build
 endef
 
 define $(package)_stage_cmds
-  $(MAKE) DESTDIR=$($(package)_staging_dir) install
+  $(MAKE) -C cmake_build DESTDIR=$($(package)_staging_dir) install
 endef
 
 define $(package)_postprocess_cmds
-  rm lib/*.la && \
-  rm include/ev*.h && \
-  rm include/event2/*_compat.h
+  if [ -f lib/*.la ]; then  rm lib/*.la; fi && \
+  if [ -f include/ev*.h ]; then rm include/ev*.h; fi && \
+  if [ -d include/event2 ] && [ -f include/event2/*_compat.h ]; then rm include/event2/*_compat.h; fi
 endef

@@ -43,15 +43,16 @@ define $(package)_config_cmds
 endef
 
 define $(package)_cmake_config_cmds
-   $($(package)_cmake) -S .. -B .
+  mkdir -p cmake_build && \
+  $($(package)_cmake) -S $($(package)_extract_dir) -B cmake_build $($(package)_cmake_opts)
 endef
 
 define $(package)_build_cmds
-  $(MAKE) src/libzmq.la
+  $(MAKE) -C cmake_build
 endef
 
 define $(package)_stage_cmds
-  $(MAKE) DESTDIR=$($(package)_staging_dir) install-libLTLIBRARIES install-includeHEADERS install-pkgconfigDATA
+  $(MAKE) -C cmake_build DESTDIR=$($(package)_staging_dir) install
 endef
 
 define $(package)_postprocess_cmds
