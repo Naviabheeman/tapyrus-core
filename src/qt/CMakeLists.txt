@@ -224,7 +224,6 @@ endif()
 
 add_executable(tapyrus-qt
   ../init/tapyrus-qt.cpp
-)
 
 add_windows_resources(tapyrus-qt res/tapyrus-qt-res.rc)
 
