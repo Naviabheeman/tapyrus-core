@@ -87,7 +87,6 @@ target_link_libraries(test_tapyrus
   tapyrus_cli
   tapyrus_node
   tapyrus_consensus
-  minisketch
   secp256k1
   Boost::headers
   libevent::extra

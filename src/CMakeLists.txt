@@ -4,7 +4,7 @@
 
 include(AddWindowsResources)
 
-configure_file(${PROJECT_SOURCE_DIR}/cmake/tapyrus-build-config.h.in tapyrus-build-config.h USE_SOURCE_PERMISSIONS @ONLY)
+configure_file(${PROJECT_SOURCE_DIR}/cmake/tapyrus-build-config.h.in tapyrus-config.h USE_SOURCE_PERMISSIONS @ONLY)
 include_directories(${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR})
 
 #=============================
@@ -17,54 +17,9 @@ include_directories(${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_SOURCE_DIR})
 # not overridden.
 include(../cmake/leveldb.cmake)
 add_subdirectory(univalue)
-#=============================
-# secp256k1 subtree
-#=============================
-message("")
-message("Configuring secp256k1 subtree...")
-set(SECP256K1_DISABLE_SHARED ON CACHE BOOL "" FORCE)
-set(SECP256K1_ENABLE_MODULE_ECDH OFF CACHE BOOL "" FORCE)
-set(SECP256K1_ENABLE_MODULE_RECOVERY ON CACHE BOOL "" FORCE)
-set(SECP256K1_ENABLE_MODULE_MUSIG OFF CACHE BOOL "" FORCE)
-set(SECP256K1_BUILD_BENCHMARK OFF CACHE BOOL "" FORCE)
-set(SECP256K1_BUILD_TESTS ${BUILD_TESTS} CACHE BOOL "" FORCE)
-set(SECP256K1_BUILD_EXHAUSTIVE_TESTS ${BUILD_TESTS} CACHE BOOL "" FORCE)
-if(NOT BUILD_TESTS)
-  # Always skip the ctime tests, if we are building no other tests.
-  # Otherwise, they are built if Valgrind is available. See SECP256K1_VALGRIND.
-  set(SECP256K1_BUILD_CTIME_TESTS ${BUILD_TESTS} CACHE BOOL "" FORCE)
-endif()
-set(SECP256K1_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
-include(GetTargetInterface)
-# -fsanitize and related flags apply to both C++ and C,
-# so we can pass them down to libsecp256k1 as CFLAGS and LDFLAGS.
-get_target_interface(SECP256K1_APPEND_CFLAGS "" sanitize_interface COMPILE_OPTIONS)
-string(STRIP "${SECP256K1_APPEND_CFLAGS} ${APPEND_CPPFLAGS}" SECP256K1_APPEND_CFLAGS)
-string(STRIP "${SECP256K1_APPEND_CFLAGS} ${APPEND_CFLAGS}" SECP256K1_APPEND_CFLAGS)
-set(SECP256K1_APPEND_CFLAGS ${SECP256K1_APPEND_CFLAGS} CACHE STRING "" FORCE)
-get_target_interface(SECP256K1_APPEND_LDFLAGS "" sanitize_interface LINK_OPTIONS)
-string(STRIP "${SECP256K1_APPEND_LDFLAGS} ${APPEND_LDFLAGS}" SECP256K1_APPEND_LDFLAGS)
-set(SECP256K1_APPEND_LDFLAGS ${SECP256K1_APPEND_LDFLAGS} CACHE STRING "" FORCE)
-# We want to build libsecp256k1 with the most tested RelWithDebInfo configuration.
-enable_language(C)
-foreach(config IN LISTS CMAKE_BUILD_TYPE CMAKE_CONFIGURATION_TYPES)
-  if(config STREQUAL "")
-    continue()
-  endif()
-  string(TOUPPER "${config}" config)
-  set(CMAKE_C_FLAGS_${config} "${CMAKE_C_FLAGS_RELWITHDEBINFO}")
-endforeach()
-# If the CFLAGS environment variable is defined during building depends
-# and configuring this build system, its content might be duplicated.
-if(DEFINED ENV{CFLAGS})
-  deduplicate_flags(CMAKE_C_FLAGS)
-endif()
-set(CMAKE_EXPORT_COMPILE_COMMANDS OFF)
-#add_subdirectory(secp256k1)
-#set_target_properties(secp256k1 PROPERTIES
-#  EXCLUDE_FROM_ALL TRUE
-#)
-set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
+add_subdirectory(secp256k1)
+
 
 # Set top-level target output locations.
 if(NOT CMAKE_RUNTIME_OUTPUT_DIRECTORY)
@@ -98,25 +53,61 @@ add_subdirectory(crypto)
 add_library(tapyrus_consensus STATIC EXCLUDE_FROM_ALL
   arith_uint256.cpp
   consensus/merkle.cpp
+  coloridentifier.cpp
   hash.cpp
   primitives/block.cpp
   primitives/transaction.cpp
+  primitives/xfield.cpp
   pubkey.cpp
+  script/tapyrusconsensus.cpp
   script/interpreter.cpp
   script/script.cpp
   script/script_error.cpp
   uint256.cpp
+  utilstrencodings.cpp
 )
 target_link_libraries(tapyrus_consensus
   PRIVATE
     core_interface
     tapyrus_crypto
     secp256k1
+    Boost::headers
 )
 
 if(WITH_ZMQ)
   add_subdirectory(zmq)
 endif()
+
+add_library(tapyrus_util STATIC EXCLUDE_FROM_ALL
+        clientversion.cpp
+        fs.cpp
+        logging.cpp
+        random.cpp
+        randomenv.cpp
+        rpc/protocol.cpp
+        support/cleanse.cpp
+        support/lockedpool.cpp
+        sync.cpp
+        threadinterrupt.cpp
+        uint256.cpp
+        util.cpp
+        utilmoneystr.cpp
+        utilstrencodings.cpp
+        utiltime.cpp
+)
+target_link_libraries(tapyrus_util
+        PRIVATE
+        univalue
+        Boost::headers
+)
+target_compile_definitions(tapyrus_util PUBLIC HAVE_CONFIG_H)
+target_include_directories(tapyrus_util
+        PUBLIC
+        .
+        # To access the config.
+        ${CMAKE_CURRENT_BINARY_DIR}
+        $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/src/univalue/include>
+)
 
 # Home for common functionality shared by different executables and libraries.
 # Similar to `tapyrus_util` library, but higher-level.
@@ -134,6 +125,7 @@ add_library(tapyrus_common STATIC EXCLUDE_FROM_ALL
   core_write.cpp
   chainparams.cpp
   key.cpp
+  keystore.cpp
   key_io.cpp
   merkleblock.cpp
   netaddress.cpp
@@ -146,6 +138,8 @@ add_library(tapyrus_common STATIC EXCLUDE_FROM_ALL
   scheduler.cpp
   script/descriptor.cpp
   script/sign.cpp
+  script/standard.cpp
+  xfieldhistory.cpp
 )
 target_link_libraries(tapyrus_common
   PRIVATE
@@ -157,6 +151,12 @@ target_link_libraries(tapyrus_common
     Boost::headers
     $<TARGET_NAME_IF_EXISTS:USDT::headers>
     $<$<PLATFORM_ID:Windows>:ws2_32>
+)
+target_include_directories(tapyrus_common
+        PRIVATE
+        $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/src/leveldb>
+        $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/src/leveldb/include>
+        $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/src/univalue/include>
 )
 
 include(InstallBinaryComponent)
@@ -171,17 +171,22 @@ add_library(tapyrus_node STATIC EXCLUDE_FROM_ALL
   addrdb.cpp
   addrman.cpp
   blockencodings.cpp
+  blockprune.cpp
+  chain.cpp
+  chainstate.cpp
+  checkpoints.cpp
   consensus/tx_verify.cpp
+  cs_main.cpp
   dbwrapper.cpp
+  file_io.cpp
   httprpc.cpp
   httpserver.cpp
   index/base.cpp
   index/txindex.cpp
   init.cpp
-  chain.cpp
-  cs_main.cpp
   net.cpp
   net_processing.cpp
+  merkleblock.cpp
   chainstate.cpp
   coins.cpp
   miner.cpp
@@ -190,25 +195,32 @@ add_library(tapyrus_node STATIC EXCLUDE_FROM_ALL
   utxo_snapshot.cpp
   warnings.cpp
   noui.cpp
+  outputtype.cpp
   policy/policy.cpp
   policy/fees.cpp
   policy/feerate.cpp
   policy/packages.cpp
   policy/rbf.cpp
-  policy/packages.cpp
   rest.cpp
   rpc/blockchain.cpp
   rpc/mempool.cpp
   rpc/mining.cpp
+  rpc/misc.cpp
   rpc/net.cpp
   rpc/rawtransaction.cpp
   rpc/server.cpp
   script/sigcache.cpp
+  script/descriptor.cpp
+  script/ismine.cpp
+  shutdown.cpp
   torcontrol.cpp
   txdb.cpp
   txmempool.cpp
+  ui_interface.cpp
   validation.cpp
   validationinterface.cpp
+  verifydb.cpp
+  zmq/zmqrpc.cpp
   $<$<TARGET_EXISTS:tapyrus_wallet>:wallet/init.cpp>
   $<$<NOT:$<TARGET_EXISTS:tapyrus_wallet>>:dummywallet.cpp>
 )
@@ -219,7 +231,6 @@ target_link_libraries(tapyrus_node
     tapyrus_util
     $<TARGET_NAME_IF_EXISTS:tapyrus_zmq>
     leveldb
-    minisketch
     univalue
     Boost::headers
     $<TARGET_NAME_IF_EXISTS:libevent::core>
@@ -228,7 +239,10 @@ target_link_libraries(tapyrus_node
     $<TARGET_NAME_IF_EXISTS:USDT::headers>
 )
 
-
+target_include_directories(tapyrus_node
+        PRIVATE
+        $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/src/leveldb/helpers/memenv>
+)
 # tapyrus Core tapyrusd.
 if(BUILD_DAEMON)
   add_executable(tapyrusd
@@ -236,11 +250,18 @@ if(BUILD_DAEMON)
   )
   add_windows_resources(tapyrusd tapyrusd-res.rc)
   target_link_libraries(tapyrusd
+    leveldb
     core_interface
     tapyrus_node
+    Boost::headers
     $<TARGET_NAME_IF_EXISTS:tapyrus_wallet>
   )
   install_binary_component(tapyrusd HAS_MANPAGE)
+
+  target_include_directories(tapyrusd
+          PUBLIC
+          ${PROJECT_SOURCE_DIR}/src/univalue/include
+  )
 endif()
 
 
@@ -251,6 +272,8 @@ target_link_libraries(tapyrus_cli
   PUBLIC
     core_interface
     univalue
+    tapyrus_consensus
+    Boost::headers
 )
 
 
@@ -261,10 +284,11 @@ if(BUILD_CLI)
   target_link_libraries(tapyrus-cli
     core_interface
     tapyrus_cli
-    tapyrus_common
     tapyrus_util
+    tapyrus_common
     libevent::core
     libevent::extra
+    Boost::headers
   )
   install_binary_component(tapyrus-cli HAS_MANPAGE)
 endif()
@@ -278,10 +302,24 @@ if(BUILD_TX)
     tapyrus_common
     tapyrus_util
     univalue
+    Boost::headers
   )
   install_binary_component(tapyrus-tx HAS_MANPAGE)
 endif()
 
+if(BUILD_GENESIS)
+  add_executable(tapyrus-genesis tapyrus-genesis.cpp)
+  add_windows_resources(tapyrus-genesis tapyrus-genesis-res.rc)
+  target_link_libraries(tapyrus-genesis
+          core_interface
+          tapyrus_common
+          tapyrus_node
+          tapyrus_util
+          univalue
+          Boost::headers
+  )
+  install_binary_component(tapyrus-genesis HAS_MANPAGE)
+endif()
 
 if(BUILD_GUI)
   add_subdirectory(qt)

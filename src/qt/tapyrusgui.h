@@ -6,7 +6,7 @@
 #define TAPYRUS_QT_TAPYRUSGUI_H
 
 #if defined(HAVE_CONFIG_H)
-#include <config/bitcoin-config.h>
+#include <tapyrus-config.h>
 #endif
 
 #include <amount.h>

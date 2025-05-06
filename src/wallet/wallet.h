@@ -7,6 +7,10 @@
 #ifndef BITCOIN_WALLET_WALLET_H
 #define BITCOIN_WALLET_WALLET_H
 
+#if defined(HAVE_CONFIG_H)
+#include <tapyrus-config.h>
+#endif
+
 #include <amount.h>
 #include <outputtype.h>
 #include <policy/feerate.h>

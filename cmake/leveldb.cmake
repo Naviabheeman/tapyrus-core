@@ -55,7 +55,7 @@ add_library(leveldb STATIC EXCLUDE_FROM_ALL
 target_compile_definitions(leveldb
   PRIVATE
     HAVE_SNAPPY=0
-    HAVE_CRC32C=1
+    HAVE_CRC32C=0
     HAVE_FDATASYNC=$<BOOL:${HAVE_FDATASYNC}>
     HAVE_FULLFSYNC=$<BOOL:${HAVE_FULLFSYNC}>
     HAVE_O_CLOEXEC=$<BOOL:${HAVE_O_CLOEXEC}>
@@ -98,7 +98,6 @@ endif()
 target_link_libraries(leveldb PRIVATE
   core_interface
   nowarn_leveldb_interface
-  crc32c
 )
 
 set_target_properties(leveldb PROPERTIES

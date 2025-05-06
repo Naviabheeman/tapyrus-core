@@ -2,28 +2,35 @@
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or https://opensource.org/license/mit/.
 
-# Wallet functionality used by bitcoind and bitcoin-wallet executables.
-add_library(tapyrus_wallet STATIC EXCLUDE_FROM_ALL
-  coincontrol.cpp
-  coinselection.cpp
-  crypter.cpp
-  db.cpp
-  feebumper.cpp
-  fees.cpp
-  wallet.cpp
-  walletdb.cpp
-  walletutil.cpp
+# Add Berkeley DB dependency.
+find_package(BerkeleyDB REQUIRED)
+
+add_library(tapyrus_wallet
+        coincontrol.cpp
+        coinselection.cpp
+        crypter.cpp
+        db.cpp
+        feebumper.cpp
+        fees.cpp
+        init.cpp
+        ../interfaces/wallet.cpp
+        rpcdump.cpp
+        rpcwallet.cpp
+        wallet.cpp
+        walletdb.cpp
+        walletutil.cpp
+        ../outputtype.cpp
+        ../script/ismine.cpp
 )
 target_link_libraries(tapyrus_wallet
   PRIVATE
     core_interface
+    tapyrus_util
     tapyrus_common
     univalue
+    ${BerkeleyDB_LIBRARY}
     Boost::headers
     $<TARGET_NAME_IF_EXISTS:USDT::headers>
 )
 
-if(USE_BDB)
-  target_sources(tapyrus_wallet PRIVATE bdb.cpp salvage.cpp)
-  target_link_libraries(tapyrus_wallet PUBLIC BerkeleyDB::BerkeleyDB)
-endif()
+target_include_directories(tapyrus_wallet PUBLIC ${BerkeleyDB_INCLUDE_DIR})

@@ -32,7 +32,6 @@ endfunction()
 create_test_config()
 
 file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/functional)
-file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/fuzz)
 file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/util)
 
 file(GLOB_RECURSE functional_tests RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} functional/*)

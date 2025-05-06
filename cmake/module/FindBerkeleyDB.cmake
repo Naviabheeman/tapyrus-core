@@ -1,53 +1,18 @@
-# Copyright (c) 2023-present The Bitcoin Core developers
-# Distributed under the MIT software license, see the accompanying
-# file COPYING or https://opensource.org/license/mit/.
-
-#[=======================================================================[
-FindBerkeleyDB
---------------
-
-Finds the Berkeley DB headers and library.
-
-Imported Targets
-^^^^^^^^^^^^^^^^
-
-This module provides imported target ``BerkeleyDB::BerkeleyDB``, if
-Berkeley DB has been found.
-
-Result Variables
-^^^^^^^^^^^^^^^^
-
-This module defines the following variables:
-
-``BerkeleyDB_FOUND``
-  "True" if Berkeley DB found.
-
-``BerkeleyDB_VERSION``
-  The MAJOR.MINOR version of Berkeley DB found.
-
-#]=======================================================================]
+# Try to find the BerkeleyDB librairies
+# BerkeleyDB_FOUND - system has Berkeley DB lib
+# BerkeleyDB_INCLUDE_DIR - the Berkeley DB include directory
+# BerkeleyDB_LIBRARY - Library needed to use Berkeley DB
 
 set(_BerkeleyDB_homebrew_prefix)
 if(CMAKE_HOST_APPLE)
-  find_program(HOMEBREW_EXECUTABLE brew)
-  if(HOMEBREW_EXECUTABLE)
-    # The Homebrew package manager installs the berkeley-db* packages as
-    # "keg-only", which means they are not symlinked into the default prefix.
-    # To find such a package, the find_path() and find_library() commands
-    # need additional path hints that are computed by Homebrew itself.
-    execute_process(
-      COMMAND ${HOMEBREW_EXECUTABLE} --prefix berkeley-db@4
-      OUTPUT_VARIABLE _BerkeleyDB_homebrew_prefix
-      ERROR_QUIET
-      OUTPUT_STRIP_TRAILING_WHITESPACE
-    )
-  endif()
+  include(BrewHelper)
+  find_brew_prefix(_BerkeleyDB_homebrew_prefix berkeley-db@4)
 endif()
 
 find_path(BerkeleyDB_INCLUDE_DIR
-  NAMES db_cxx.h
-  HINTS ${_BerkeleyDB_homebrew_prefix}/include
-  PATH_SUFFIXES 4.8 48 db4.8 4 db4 5.3 db5.3 5 db5
+        NAMES db_cxx.h
+        HINTS ${_BerkeleyDB_homebrew_prefix}/include
+        PATH_SUFFIXES 4.8 48 db4.8 4 db4 5.3 db5.3 5 db5
 )
 mark_as_advanced(BerkeleyDB_INCLUDE_DIR)
 unset(_BerkeleyDB_homebrew_prefix)
@@ -64,18 +29,18 @@ if(NOT BerkeleyDB_LIBRARY)
   get_filename_component(_BerkeleyDB_lib_hint "${BerkeleyDB_INCLUDE_DIR}" DIRECTORY)
 
   find_library(BerkeleyDB_LIBRARY_RELEASE
-    NAMES db_cxx-4.8 db4_cxx db48 db_cxx-5.3 db_cxx-5 db_cxx libdb48
-    NAMES_PER_DIR
-    HINTS ${_BerkeleyDB_lib_hint}
-    PATH_SUFFIXES lib
+          NAMES db_cxx-4.8 db4_cxx db48 db_cxx-5.3 db_cxx-5 db_cxx libdb48
+          NAMES_PER_DIR
+          HINTS ${_BerkeleyDB_lib_hint}
+          PATH_SUFFIXES lib
   )
   mark_as_advanced(BerkeleyDB_LIBRARY_RELEASE)
 
   find_library(BerkeleyDB_LIBRARY_DEBUG
-    NAMES db_cxx-4.8 db4_cxx db48 db_cxx-5.3 db_cxx-5 db_cxx libdb48
-    NAMES_PER_DIR
-    HINTS ${_BerkeleyDB_lib_hint}
-    PATH_SUFFIXES debug/lib
+          NAMES db_cxx-4.8 db4_cxx db48 db_cxx-5.3 db_cxx-5 db_cxx libdb48
+          NAMES_PER_DIR
+          HINTS ${_BerkeleyDB_lib_hint}
+          PATH_SUFFIXES debug/lib
   )
   mark_as_advanced(BerkeleyDB_LIBRARY_DEBUG)
 
@@ -105,29 +70,29 @@ endif()
 
 include(FindPackageHandleStandardArgs)
 find_package_handle_standard_args(BerkeleyDB
-  REQUIRED_VARS BerkeleyDB_LIBRARY BerkeleyDB_INCLUDE_DIR
-  VERSION_VAR _BerkeleyDB_full_version
+        REQUIRED_VARS BerkeleyDB_LIBRARY BerkeleyDB_INCLUDE_DIR
+        VERSION_VAR _BerkeleyDB_full_version
 )
 unset(_BerkeleyDB_full_version)
 
 if(BerkeleyDB_FOUND AND NOT TARGET BerkeleyDB::BerkeleyDB)
   add_library(BerkeleyDB::BerkeleyDB UNKNOWN IMPORTED)
   set_target_properties(BerkeleyDB::BerkeleyDB PROPERTIES
-    INTERFACE_INCLUDE_DIRECTORIES "${BerkeleyDB_INCLUDE_DIR}"
+          INTERFACE_INCLUDE_DIRECTORIES "${BerkeleyDB_INCLUDE_DIR}"
   )
   if(BerkeleyDB_LIBRARY_RELEASE)
     set_property(TARGET BerkeleyDB::BerkeleyDB APPEND PROPERTY
-      IMPORTED_CONFIGURATIONS RELEASE
+            IMPORTED_CONFIGURATIONS RELEASE
     )
     set_target_properties(BerkeleyDB::BerkeleyDB PROPERTIES
-      IMPORTED_LOCATION_RELEASE "${BerkeleyDB_LIBRARY_RELEASE}"
+            IMPORTED_LOCATION_RELEASE "${BerkeleyDB_LIBRARY_RELEASE}"
     )
   endif()
   if(BerkeleyDB_LIBRARY_DEBUG)
     set_property(TARGET BerkeleyDB::BerkeleyDB APPEND PROPERTY
-      IMPORTED_CONFIGURATIONS DEBUG)
+            IMPORTED_CONFIGURATIONS DEBUG)
     set_target_properties(BerkeleyDB::BerkeleyDB PROPERTIES
-      IMPORTED_LOCATION_DEBUG "${BerkeleyDB_LIBRARY_DEBUG}"
+            IMPORTED_LOCATION_DEBUG "${BerkeleyDB_LIBRARY_DEBUG}"
     )
   endif()
 endif()

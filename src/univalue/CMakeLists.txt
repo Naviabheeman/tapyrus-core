@@ -81,6 +81,10 @@ if(BUILD_TESTS)
       core_interface
       univalue
   )
+  target_compile_definitions(unitester
+    PRIVATE
+      JSON_TEST_SRC="${CMAKE_CURRENT_SOURCE_DIR}/test"
+  )
   add_test(NAME univalue_test
     COMMAND unitester
   )
