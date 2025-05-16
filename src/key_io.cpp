@@ -212,3 +212,8 @@ bool IsValidDestinationString(const std::string& str)
 {
     return IsValidDestinationString(str, Params());
 }
+
+std::ostream& operator<<(std::ostream& os, const CExtKey& key) {
+    os << EncodeExtKey(key);
+    return os;
+}

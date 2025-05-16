@@ -4,6 +4,9 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include <random.h>
+#include <unistd.h>     // For read(), close()
+#include <sys/types.h>  // For ssize_t
+
 
 #include <compat/cpuid.h>
 #include <crypto/sha256.h>

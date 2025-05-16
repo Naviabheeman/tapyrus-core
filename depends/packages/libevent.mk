@@ -11,12 +11,14 @@ define $(package)_set_vars
   $(package)_config_opts=--disable-shared --disable-openssl --disable-libevent-regress --disable-samples
   $(package)_config_opts += --disable-dependency-tracking --enable-option-checking
   $(package)_config_opts_release=--disable-debug-mode
-  $(package)_config_opts_linux=--with-pic
   $(package)_cppflags_mingw32=-D_WIN32_WINNT=0x0601
 
-  ifeq ($(NO_HARDEN),)
-  $(package)_cppflags+=-D_FORTIFY_SOURCE=3
-  endif
+  # CMake configuration options
+  $(package)_cmake_opts=-DCMAKE_BUILD_TYPE=None -DEVENT__DISABLE_BENCHMARK=ON -DEVENT__DISABLE_OPENSSL=ON
+  $(package)_cmake_opts+=-DEVENT__DISABLE_SAMPLES=ON -DEVENT__DISABLE_REGRESS=ON
+  $(package)_cmake_opts+=-DEVENT__DISABLE_TESTS=ON -DEVENT__LIBRARY_TYPE=STATIC
+  $(package)_cflags += -fdebug-prefix-map=$($(package)_extract_dir)=/usr -fmacro-prefix-map=$($(package)_extract_dir)=/usr
+  $(package)_cppflags += -D_GNU_SOURCE -D_FORTIFY_SOURCE=3
 endef
 
 define $(package)_preprocess_cmds
@@ -27,16 +29,21 @@ define $(package)_config_cmds
   $($(package)_autoconf)
 endef
 
+define $(package)_cmake_config_cmds
+  mkdir -p cmake_build && \
+  $($(package)_cmake) -S $($(package)_extract_dir) -B cmake_build $($(package)_cmake_opts)
+endef
+
 define $(package)_build_cmds
-  $(MAKE)
+  $(MAKE) -C cmake_build
 endef
 
 define $(package)_stage_cmds
-  $(MAKE) DESTDIR=$($(package)_staging_dir) install
+  $(MAKE) -C cmake_build DESTDIR=$($(package)_staging_dir) install
 endef
 
 define $(package)_postprocess_cmds
-  rm lib/*.la && \
-  rm include/ev*.h && \
-  rm include/event2/*_compat.h
+  if [ -f lib/*.la ]; then  rm lib/*.la; fi && \
+  if [ -f include/ev*.h ]; then rm include/ev*.h; fi && \
+  if [ -d include/event2 ] && [ -f include/event2/*_compat.h ]; then rm include/event2/*_compat.h; fi
 endef

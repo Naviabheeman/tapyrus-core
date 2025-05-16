@@ -41,3 +41,8 @@ std::string CFeeRate::ToString() const
 {
     return strprintf("%d.%08d %s/kB", nTapyrusPerk / COIN, nTapyrusPerk % COIN, CURRENCY_UNIT);
 }
+
+std::ostream& operator<<(std::ostream& os, const CFeeRate& fee_rate) {
+    os << fee_rate.ToString();
+    return os;
+}

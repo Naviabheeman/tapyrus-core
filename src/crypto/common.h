@@ -5,10 +5,9 @@
 #ifndef BITCOIN_CRYPTO_COMMON_H
 #define BITCOIN_CRYPTO_COMMON_H
 
-#if defined(HAVE_CONFIG_H)
-#include <config/bitcoin-config.h>
-#endif
+#include <tapyrus-config.h>
 
+#include <limits>
 #include <stdint.h>
 #include <string.h>
 
@@ -79,19 +78,9 @@ void static inline WriteBE64(unsigned char* ptr, uint64_t x)
     memcpy(ptr, (char*)&v, 8);
 }
 
-/** Return the smallest number n such that (x >> n) == 0 (or 64 if the highest bit in x is set. */
-uint64_t static inline CountBits(uint64_t x)
+template<typename I>/** Return the smallest number n such that (x >> n) == 0 (or 64 if the highest bit in x is set. */
+uint64_t static inline CountBits(I x)
 {
-#if HAVE_DECL___BUILTIN_CLZL
-    if (sizeof(unsigned long) >= sizeof(uint64_t)) {
-        return x ? 8 * sizeof(unsigned long) - __builtin_clzl(x) : 0;
-    }
-#endif
-#if HAVE_DECL___BUILTIN_CLZLL
-    if (sizeof(unsigned long long) >= sizeof(uint64_t)) {
-        return x ? 8 * sizeof(unsigned long long) - __builtin_clzll(x) : 0;
-    }
-#endif
     int ret = 0;
     while (x) {
         x >>= 1;

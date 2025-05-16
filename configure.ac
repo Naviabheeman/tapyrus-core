@@ -1,5 +1,6 @@
 dnl require autoconf 2.60 (AS_ECHO/AS_ECHO_N)
 AC_PREREQ([2.60])
+define(CLIENT_NAME "Tapyrus Core")
 define(_CLIENT_VERSION_MAJOR, 0)
 define(_CLIENT_VERSION_MINOR, 6)
 define(_CLIENT_VERSION_REVISION, 1)
@@ -10,7 +11,7 @@ define(_COPYRIGHT_HOLDERS,[The %s developers])
 define(_COPYRIGHT_HOLDERS_SUBSTITUTION,[[Bitcoin Core]])
 AC_INIT([Tapyrus Core],[_CLIENT_VERSION_MAJOR._CLIENT_VERSION_MINOR._CLIENT_VERSION_REVISION],[https://github.com/chaintope/tapyrus-core/issues],[tapyrus-core],[https://www.chaintope.com])
 AC_CONFIG_SRCDIR([src/validation.cpp])
-AC_CONFIG_HEADERS([src/config/bitcoin-config.h])
+AC_CONFIG_HEADERS([src/config/tapyrus-config.h])
 AC_CONFIG_AUX_DIR([build-aux])
 AC_CONFIG_MACRO_DIR([build-aux/m4])
 
@@ -557,7 +558,12 @@ case $host in
            dnl cross-builds because strip attempts to call a hard-coded ld,
            dnl which may not exist in the path. Stripping the .a is not
            dnl necessary, so just disable it.
-           old_striplib=
+           dnl old_striplib=
+           RANLIB=llvm-ranlib
+           STRIP=llvm-strip
+           if test ! -x "$(which $STRIP)"; then
+             AC_MSG_ERROR([$STRIP not found. Please ensure llvm tools are properly installed.])
+           fi
            ;;
        esac
      fi
@@ -638,7 +644,7 @@ dnl Check for pthread compile/link requirements
 AX_PTHREAD
 
 
-# The following macro will add the necessary defines to bitcoin-config.h, but
+# The following macro will add the necessary defines to tapyrus-config.h, but
 # they also need to be passed down to any subprojects. Pull the results out of
 # the cache and add them to CPPFLAGS.
 AC_SYS_LARGEFILE
@@ -739,7 +745,6 @@ AC_CHECK_DECLS([bswap_16, bswap_32, bswap_64],,,
                  #include <byteswap.h>
                  #endif])
 
-AC_CHECK_DECLS([__builtin_clz, __builtin_clzl, __builtin_clzll])
 
 dnl Check for malloc_info (for memory statistics information in getmemoryinfo)
 AC_MSG_CHECKING(for getmemoryinfo)

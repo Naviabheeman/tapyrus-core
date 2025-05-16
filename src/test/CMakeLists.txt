@@ -1,157 +1,143 @@
-# Copyright (c) 2018 The Bitcoin developers
+# Copyright (c) 2023-present The Bitcoin Core developers
+# Distributed under the MIT software license, see the accompanying
+# file COPYING or https://opensource.org/license/mit/.
 
-project(tapyrus-test)
-
-# Process json files.
-file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/data")
-
-find_package(Python3 REQUIRED COMPONENTS Interpreter)
-function(gen_json_header NAME)
-	set(HEADERS "")
-	foreach(f ${ARGN})
-		set(h "${CMAKE_CURRENT_BINARY_DIR}/${f}.h")
-
-		# Get the proper name for the test variable.
-		get_filename_component(TEST_NAME ${f} NAME_WE)
-		add_custom_command(OUTPUT ${h}
-			COMMAND ${Python3_EXECUTABLE}
-			ARGS
-				"${CMAKE_CURRENT_SOURCE_DIR}/data/generate_header.py"
-				"${TEST_NAME}"
-				"${CMAKE_CURRENT_SOURCE_DIR}/${f}" > ${h}
-			MAIN_DEPENDENCY ${f}
-			DEPENDS
-				"data/generate_header.py"
-			VERBATIM
-		)
-		list(APPEND HEADERS ${h})
-	endforeach(f)
-	set(${NAME} "${HEADERS}" PARENT_SCOPE)
-endfunction()
-
-gen_json_header(JSON_HEADERS
-		data/base58_encode_decode.json
-		data/key_io_invalid.json
-		data/key_io_valid.json
-		data/script_tests.json
-		data/sighash.json
-		data/tx_invalid.json
-		data/tx_valid.json
+# Do not use generator expressions in test sources because the
+# SOURCES property is processed to gather test suite macros.
+add_executable(test_tapyrus
+  addrman_tests.cpp
+  allocator_tests.cpp
+  amount_tests.cpp
+  arith_uint256_tests.cpp
+  base32_tests.cpp
+  base58_tests.cpp
+  base64_tests.cpp
+  bech32_tests.cpp
+  bip32_tests.cpp
+  blockencodings_tests.cpp
+  bloom_tests.cpp
+  bswap_tests.cpp
+  checkqueue_tests.cpp
+  coins_tests.cpp
+  compress_tests.cpp
+  crypto_tests.cpp
+  cuckoocache_tests.cpp
+  dbwrapper_tests.cpp
+  denialofservice_tests.cpp
+  descriptor_tests.cpp
+  getarg_tests.cpp
+  hash_tests.cpp
+  key_io_tests.cpp
+  key_tests.cpp
+  mempool_tests.cpp
+  merkle_tests.cpp
+  merkleblock_tests.cpp
+  miner_tests.cpp
+  multisig_tests.cpp
+  net_tests.cpp
+  netbase_tests.cpp
+  policyestimator_tests.cpp
+  prevector_tests.cpp
+  raii_event_tests.cpp
+  random_tests.cpp
+  reverselock_tests.cpp
+  rpc_tests.cpp
+  sanity_tests.cpp
+  scheduler_tests.cpp
+  script_p2sh_tests.cpp
+  script_standard_tests.cpp
+  script_tests.cpp
+  scriptnum_tests.cpp
+  serialize_tests.cpp
+  sighash_tests.cpp
+  sigopcount_tests.cpp
+  skiplist_tests.cpp
+  streams_tests.cpp
+  timeoffsets_tests.cpp
+  torcontrol_tests.cpp
+  transaction_tests.cpp
+  txindex_tests.cpp
+  txpackage_tests.cpp
+  txvalidation_tests.cpp
+  txvalidationcache_tests.cpp
+  uint256_tests.cpp
+  util_tests.cpp
+  validation_block_tests.cpp
 )
 
-include(TestSuite)
-create_test_suite(tapyrus)
-add_dependencies(check check-tapyrus)
+include(TargetDataSources)
+target_json_data_sources(test_tapyrus
+  data/base58_encode_decode.json
+  data/key_io_invalid.json
+  data/key_io_valid.json
+  data/script_tests.json
+  data/sighash.json
+  data/tx_invalid.json
+  data/tx_valid.json
+)
 
-add_test_to_suite(tapyrus test_tapyrus
-		addrman_tests.cpp
-		allocator_tests.cpp
-		amount_tests.cpp
-		arith_uint256_tests.cpp
-		base32_tests.cpp
-		base58_tests.cpp
-		base64_tests.cpp
-		bech32_tests.cpp
-		bip32_tests.cpp
-		block_tests.cpp
-		blockencodings_tests.cpp
-		bloom_tests.cpp
-		bswap_tests.cpp
-		chainparams_tests.cpp
-		federationparams_tests.cpp
-		checkdatasig_tests.cpp
-		checkqueue_tests.cpp
-		coins_tests.cpp
-		coloridentifier_tests.cpp
-		compress_tests.cpp
-		crypto_tests.cpp
-		cuckoocache_tests.cpp
-		dbwrapper_tests.cpp
-		denialofservice_tests.cpp
-		descriptor_tests.cpp
-		getarg_tests.cpp
-		hash_tests.cpp
-		key_io_tests.cpp
-		key_tests.cpp
-		limitedmap_tests.cpp
-		main_tests.cpp
-		mempool_tests.cpp
-		merkle_tests.cpp
-		merkleblock_tests.cpp
-		miner_tests.cpp
-		multisig_tests.cpp
-		net_tests.cpp
-		netbase_tests.cpp
-		pmt_tests.cpp
-		policyestimator_tests.cpp
-		prevector_tests.cpp
-		raii_event_tests.cpp
-		random_tests.cpp
-		reverselock_tests.cpp
-		rpc_tests.cpp
-		sanity_tests.cpp
-		scheduler_tests.cpp
-		script_p2sh_tests.cpp
-		script_standard_tests.cpp
-		script_tests.cpp
-		scriptnum_tests.cpp
-		serialize_tests.cpp
-		sighash_tests.cpp
-		sigopcount_tests.cpp
-		skiplist_tests.cpp
-		streams_tests.cpp
-		test_tapyrus.cpp
-		test_tapyrus_fuzzy.cpp
-		test_tapyrus_main.cpp
-		test_keys_helper.cpp
-		torcontrol_tests.cpp
-		transaction_tests.cpp
-		txdb_tests.cpp
-		txindex_tests.cpp
-		txpackage_tests.cpp
-		txvalidation_tests.cpp
-		txvalidationcache_tests.cpp
-		uint256_tests.cpp
-		util_tests.cpp
-		validation_block_tests.cpp
-		xfieldhistory_tests.cpp
-		xfield_tests.cpp
-	# Tests generated from JSON
-	${JSON_HEADERS}
+target_link_libraries(test_tapyrus
+  core_interface
+  tapyrus_cli
+  tapyrus_server
+  tapyrus_consensus
+  secp256k1
+  Boost::headers
+  libevent::extra
+)
+target_compile_definitions(test_tapyrus PRIVATE
+        BOOST_TEST_DYN_LINK=1
+        BOOST_TEST_MODULE=Tapyrus_Test_Suite
+        BOOST_TEST_NO_OLD_TOOLS
 )
 
 target_include_directories(test_tapyrus
-	PUBLIC
-		# To access the generated json headers.
-		${CMAKE_CURRENT_BINARY_DIR}
+        PRIVATE
+        $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/src/leveldb/include>
+        $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/src/leveldb/helpers/memenv>
+        ${BerkeleyDB_INCLUDE_DIR}
 )
 
-find_package(Boost 1.81 REQUIRED unit_test_framework)
-
-target_link_libraries(test_tapyrus Boost::unit_test_framework rpcclient server)
-
-# We need to detect if the BOOST_TEST_DYN_LINK flag is required.
-set(CMAKE_REQUIRED_LIBRARIES Boost::unit_test_framework)
-check_cxx_source_compiles("
-	#define BOOST_TEST_DYN_LINK
-	#define BOOST_TEST_MAIN
-	#include <boost/test/unit_test.hpp>
-" BOOST_TEST_DYN_LINK)
-
-if(BOOST_TEST_DYN_LINK)
-	target_compile_definitions(test_tapyrus PRIVATE BOOST_TEST_DYN_LINK)
-endif(BOOST_TEST_DYN_LINK)
-
-if(BUILD_TAPYRUS_WALLET)
-	target_sources(test_tapyrus
-		PRIVATE
-			../wallet/test/accounting_tests.cpp
-			../wallet/test/coinselector_tests.cpp
-			../wallet/test/psbt_wallet_tests.cpp
-			../wallet/test/wallet_crypto_tests.cpp
-			../wallet/test/wallet_test_fixture.cpp
-			../wallet/test/wallet_tests.cpp
-			../wallet/test/create_transaction_tests.cpp
-			../wallet/test/test_tapyrus_wallet.cpp
-	)
+if(ENABLE_WALLET)
+  add_subdirectory(${PROJECT_SOURCE_DIR}/src/wallet/test wallet)
 endif()
+
+function(add_boost_test source_file)
+  if(NOT EXISTS ${source_file})
+    return()
+  endif()
+
+  file(READ "${source_file}" source_file_content)
+  string(REGEX
+    MATCH "(BOOST_FIXTURE_TEST_SUITE|BOOST_AUTO_TEST_SUITE)\\(([A-Za-z0-9_]+)"
+    test_suite_macro "${source_file_content}"
+  )
+  string(REGEX
+    REPLACE "(BOOST_FIXTURE_TEST_SUITE|BOOST_AUTO_TEST_SUITE)\\(" ""
+    test_suite_name "${test_suite_macro}"
+  )
+  if(test_suite_name)
+    add_test(NAME ${test_suite_name}
+      COMMAND test_tapyrus --run_test=${test_suite_name} --catch_system_error=no --log_level=test_suite -- DEBUG_LOG_OUT
+    )
+    set_property(TEST ${test_suite_name} PROPERTY
+      SKIP_REGULAR_EXPRESSION "no test cases matching filter"
+    )
+  endif()
+endfunction()
+
+function(add_all_test_targets)
+  get_target_property(test_source_dir test_tapyrus SOURCE_DIR)
+  get_target_property(test_sources test_tapyrus SOURCES)
+  foreach(test_source ${test_sources})
+    cmake_path(IS_RELATIVE test_source result)
+    if(result)
+      cmake_path(APPEND test_source_dir ${test_source} OUTPUT_VARIABLE test_source)
+    endif()
+    add_boost_test(${test_source})
+  endforeach()
+endfunction()
+
+add_all_test_targets()
+
+install_binary_component(test_tapyrus)

@@ -48,6 +48,7 @@ public:
     CFeeRate& operator+=(const CFeeRate& a) { nTapyrusPerk += a.nTapyrusPerk; return *this; }
     std::string ToString() const;
 
+    friend inline std::ostream& operator<<(std::ostream& os, const CFeeRate& fee_rate);
     ADD_SERIALIZE_METHODS;
 
     template <typename Stream, typename Operation>

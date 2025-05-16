@@ -11,7 +11,7 @@
 #include <script/standard.h>
 
 #if defined(HAVE_CONFIG_H)
-#include <config/bitcoin-config.h>
+#include <tapyrus-config.h>
 #endif
 
 #include <qt/walletmodeltransaction.h>

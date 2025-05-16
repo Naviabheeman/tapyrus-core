@@ -15,7 +15,6 @@
 #include <scheduler.h>
 #include <txdb.h>
 #include <txmempool.h>
-#include <consensus/consensus.h>
 
 #include <memory>
 
@@ -49,6 +48,11 @@ void writeTestGenesisBlockToFile(fs::path genesisPath, std::string genesisFileNa
 void createSignedBlockProof(CBlock &block, std::vector<unsigned char>& blockProof);
 // define an implicit conversion here so that uint256 may be used directly in BOOST_CHECK_*
 std::ostream& operator<<(std::ostream& os, const uint256& num);
+template<unsigned int BITS>
+std::ostream& operator<<(std::ostream& os, const base_uint<BITS>& num) {
+    os << num.ToString();
+    return os;
+}
 
 /** Basic testing setup.
  * This just configures logging and chain parameters.
@@ -137,4 +141,41 @@ struct TestMemPoolEntryHelper
     TestMemPoolEntryHelper &SigOpsCost(unsigned int _sigopsCost) { sigOpCost = _sigopsCost; return *this; }
 };
 
+#include <sstream>
+#include <boost/test/tools/detail/print_helper.hpp>
+#include <streams.h>
+
+// Generic print helper for any class that has a Serialize method
+template <typename T>
+struct SerializableToStreamHelper {
+    static std::string ToString(const T& obj) {
+        CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
+        obj.Serialize(ss);
+        return HexStr(ss.begin(), ss.end());
+    }
+};
+
+
+namespace boost {
+    namespace test_tools {
+        namespace tt_detail {
+
+            // Print helper for CExtKey using its Serialize method
+            template<>
+            struct print_helper<CExtKey> {
+                static void print(std::ostream& os, const CExtKey& key) {
+                    os << SerializableToStreamHelper<CExtKey>::ToString(key);
+                }
+            };
+
+            // Print helper for CExtPubKey using its Serialize method
+            template<>
+            struct print_helper<CFeeRate> {
+                static void print(std::ostream& os, const CFeeRate& fee_rate) {
+                    os << fee_rate.ToString();
+                }
+            };
+        } // namespace tt_detail
+    } // namespace test_tools
+} // namespace boost
 #endif //TAPYRUS_TEST_TEST_TAPYRUS_H

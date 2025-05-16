@@ -8,8 +8,10 @@ define $(package)_set_vars
 $(package)_config_opts=--disable-shared --without-tools --without-tests --without-png
 $(package)_config_opts += --disable-gprof --disable-gcov --disable-mudflap
 $(package)_config_opts += --disable-dependency-tracking --enable-option-checking
-$(package)_config_opts_linux=--with-pic
 $(package)_cflags += -Wno-int-conversion -Wno-implicit-function-declaration
+$(package)_cmake_opts := -DWITH_TOOLS=NO -DWITH_TESTS=NO -DGPROF=OFF -DCOVERAGE=OFF
+$(package)_cmake_opts += -DCMAKE_DISABLE_FIND_PACKAGE_PNG=TRUE -DWITHOUT_PNG=ON
+$(package)_cmake_opts += -DCMAKE_DISABLE_FIND_PACKAGE_ICONV=TRUE
 endef
 
 define $(package)_preprocess_cmds
@@ -20,14 +22,19 @@ define $(package)_config_cmds
   $($(package)_autoconf)
 endef
 
+define $(package)_cmake_config_cmds
+  mkdir -p cmake_build && \
+  $($(package)_cmake) -S $($(package)_extract_dir) -B cmake_build $($(package)_cmake_opts)
+endef
+
 define $(package)_build_cmds
-  $(MAKE)
+  $(MAKE) -C cmake_build
 endef
 
 define $(package)_stage_cmds
-  $(MAKE) DESTDIR=$($(package)_staging_dir) install
+  $(MAKE) -C cmake_build DESTDIR=$($(package)_staging_dir) install
 endef
 
 define $(package)_postprocess_cmds
-  rm lib/*.la
+  if [ -f lib/*.la ]; then rm lib/*.la; fi
 endef

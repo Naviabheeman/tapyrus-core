@@ -185,6 +185,7 @@ struct CExtKey {
         s.read((char *)&code[0], len);
         Decode(code);
     }
+    friend inline std::ostream& operator<<(std::ostream& os, const CExtKey&);
 };
 
 /** Initialize the elliptic curve support. May not be called twice without calling ECC_Stop first. */

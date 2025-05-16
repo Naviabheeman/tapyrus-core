@@ -7,19 +7,27 @@ $(package)_sha256_hash=8bee39bd3968c4804b70614a0a3ad597299ad0e824bc8aad5ce8aaf48
 define $(package)_set_vars
   $(package)_config_opts=--without-zlib --without-png --without-harfbuzz --without-bzip2 --disable-static
   $(package)_config_opts += --enable-option-checking --without-brotli
-  $(package)_config_opts_linux=--with-pic
+  $(package)_cmake_opts := -DCMAKE_BUILD_TYPE=None -DBUILD_SHARED_LIBS=TRUE
+  $(package)_cmake_opts += -DCMAKE_DISABLE_FIND_PACKAGE_ZLIB=TRUE -DCMAKE_DISABLE_FIND_PACKAGE_PNG=TRUE
+  $(package)_cmake_opts += -DCMAKE_DISABLE_FIND_PACKAGE_HarfBuzz=TRUE -DCMAKE_DISABLE_FIND_PACKAGE_BZip2=TRUE
+  $(package)_cmake_opts += -DCMAKE_DISABLE_FIND_PACKAGE_BrotliDec=TRUE
 endef
 
 define $(package)_config_cmds
   $($(package)_autoconf)
 endef
 
+define $(package)_cmake_config_cmds
+  mkdir -p cmake_build && \
+  $($(package)_cmake) -S $($(package)_extract_dir) -B cmake_build $($(package)_cmake_opts)
+endef
+
 define $(package)_build_cmds
-  $(MAKE)
+  $(MAKE) -C cmake_build
 endef
 
 define $(package)_stage_cmds
-  $(MAKE) DESTDIR=$($(package)_staging_dir) install
+  $(MAKE) -C cmake_build DESTDIR=$($(package)_staging_dir) install
 endef
 
 define $(package)_postprocess_cmds
