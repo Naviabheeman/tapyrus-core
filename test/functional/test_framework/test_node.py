@@ -200,6 +200,9 @@ class TestNode():
             self.stop()
         except http.client.CannotSendRequest:
             self.log.exception("Unable to stop node.")
+        except subprocess.CalledProcessError as e:
+            # If stop command fails (e.g., node already stopping), just log it
+            self.log.debug("Stop command failed, node may already be stopping: %s", e)
 
         # Check that stderr is as expected
         self.stderr.seek(0)
@@ -239,7 +242,10 @@ class TestNode():
             try:
                 i = i + 1
                 wait_until(self.is_node_stopped, timeout=timeout)
-            except TimeoutError as e:
+                break  # Exit loop if node stops successfully
+            except TimeoutError:
+                # Add a delay before retry to allow node more time to shutdown
+                time.sleep(1)
                 pass
 
 

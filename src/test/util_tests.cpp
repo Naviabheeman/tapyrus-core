@@ -1178,7 +1178,6 @@ enum : char {
 }
 #endif
 
-/* temporarily disabling test as it fails in cmake CI
 BOOST_AUTO_TEST_CASE(test_LockDirectory)
 {
     fs::path dirname = GetDataDir() / "lock_dir";
@@ -1193,8 +1192,6 @@ BOOST_AUTO_TEST_CASE(test_LockDirectory)
     if (!pid) {
         BOOST_CHECK_EQUAL(close(fd[1]), 0); // Child: close parent end
         TestOtherProcess(dirname, lockname, fd[0]);
-        //avoid seg fault in child process
-        ECC_Stop();
     }
     BOOST_CHECK_EQUAL(close(fd[0]), 0); // Parent: close child end
 
@@ -1267,6 +1264,5 @@ BOOST_AUTO_TEST_CASE(test_LockDirectory)
     ReleaseDirectoryLocks();
     fs::remove_all(dirname);
 }
-*/
 
 BOOST_AUTO_TEST_SUITE_END()
