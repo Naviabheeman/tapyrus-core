@@ -118,7 +118,7 @@ class ChainstateWriteCrashTest(BitcoinTestFramework):
             return False
         except OSError as e:
             self.log.debug("node %d submitblock raised OSError exception: errno=%s", node_index, e.errno)
-            if e.errno in [errno.EPIPE, errno.ECONNREFUSED, errno.ECONNRESET]:
+            if e.errno in [errno.EPIPE, errno.ECONNREFUSED, errno.ECONNRESET, errno.EINVAL]:
                 # The node has likely crashed
                 return False
             else:
