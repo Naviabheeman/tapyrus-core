@@ -1216,8 +1216,8 @@ BOOST_AUTO_TEST_CASE(test_LockDirectory)
     BOOST_CHECK_EQUAL(LockDirectory(dirname, lockname), LockResult::Success);
 
     // Another lock on the directory from a different thread within the same process should succeed
-    bool threadresult;
-    std::thread thr([&] { threadresult = LockDirectory(dirname, lockname) == LockResult::Success; });
+    LockResult threadresult;
+    std::thread thr([&] { threadresult = LockDirectory(dirname, lockname); });
     thr.join();
     BOOST_CHECK_EQUAL(threadresult, LockResult::Success);
 #ifndef WIN32
