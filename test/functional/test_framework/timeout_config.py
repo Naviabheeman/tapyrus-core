@@ -17,25 +17,25 @@ TIME_TO_CONNECT = 2  # Default: 2 seconds
 # All other timeouts = immediate_timeout * multiplier
 
 # Maximum duration for any single test
-TOTAL_TEST_DURATION_MULTIPLIER = 900  # 900x immediate (3600s = 60min with immediate=4s)
+TOTAL_TEST_DURATION_MULTIPLIER = 1000  # 1000x immediate
 
 # Node synchronization timeout - time for multiple nodes to sync  
-TAPYRUSD_SYNC_TIMEOUT_MULTIPLIER = 225  # 225x immediate (900s = 15min with immediate=4s)
+TAPYRUSD_SYNC_TIMEOUT_MULTIPLIER = 225  # 225x immediate
 
 # Complex operations timeout - time to wait for tapyrusd to start with reindex/reorg
-TAPYRUSD_REORG_TIMEOUT_MULTIPLIER = 150  # 150x immediate (600s = 10min with immediate=4s)
+TAPYRUSD_REORG_TIMEOUT_MULTIPLIER = 150  # 150x immediate
 
 # Process startup timeout - time to wait for tapyrusd to start normally
-TAPYRUSD_PROC_TIMEOUT_MULTIPLIER = 75  # 75x immediate (300s = 5min with immediate=4s)
+TAPYRUSD_PROC_TIMEOUT_MULTIPLIER = 75  # 75x immediate
 
 # Message response timeout - time to wait for a response from tapyrusd
-TAPYRUSD_MESSAGE_TIMEOUT_MULTIPLIER = 30  # 30x immediate (120s = 2min with immediate=4s)
+TAPYRUSD_MESSAGE_TIMEOUT_MULTIPLIER = 30  # 30x immediate
 
 # P2P message operations timeout
-TAPYRUSD_P2P_TIMEOUT_MULTIPLIER = 7.5  # 7.5x immediate (30s with immediate=4s)
+TAPYRUSD_P2P_TIMEOUT_MULTIPLIER = 7.5  # 7.5x immediate
 
 # Minimum timeout - shortest timeout for quick operations
-TAPYRUSD_MIN_TIMEOUT_MULTIPLIER = 1.25  # 1.25x immediate (5s with immediate=4s)
+TAPYRUSD_MIN_TIMEOUT_MULTIPLIER = 1.25  # 1.25x immediate
 
 
 def set_time_to_connect(time_to_connect):
