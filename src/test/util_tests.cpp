@@ -1131,14 +1131,14 @@ enum : char {
     ResUnlockSuccess,
 };
 
-[[noreturn]] static void TestOtherProcess(fs::path dirname, fs::path lockname, int fd)
+static void TestOtherProcess(fs::path dirname, fs::path lockname, int fd)
 {
     char ch;
     while (true) {
         int rv = read(fd, &ch, 1); // Wait for command
         if (rv != 1) {
             fprintf(stderr, "Child process: Failed to read command, rv = %d\n", rv);
-            exit(1); // Exit with error
+            _exit(1); // Use _exit instead of exit to avoid destructors
         }
         switch(ch) {
         case LockCommand:
@@ -1150,12 +1150,12 @@ enum : char {
                     case LockResult::ErrorLock: return ResErrorLock;
                 } // No default case, so the compiler can warn about missing cases
                 fprintf(stderr, "Child process: Unexpected LockDirectory result: %d\n", (int)lock_result);
-                exit(2); // Exit with error for unexpected LockResult
+                _exit(2); // Use _exit instead of exit to avoid destructors
             }();
             rv = write(fd, &ch, 1);
             if (rv != 1) {
                 fprintf(stderr, "Child process: Failed to write lock result, rv = %d\n", rv);
-                exit(3); // Exit with error
+                _exit(3); // Use _exit instead of exit to avoid destructors
             }
             break;
         case UnlockCommand:
@@ -1164,15 +1164,15 @@ enum : char {
             rv = write(fd, &ch, 1);
             if (rv != 1) {
                 fprintf(stderr, "Child process: Failed to write unlock result, rv = %d\n", rv);
-                exit(4); // Exit with error
+                _exit(4); // Use _exit instead of exit to avoid destructors
             }
             break;
         case ExitCommand:
             close(fd);
-            exit(0);
+            _exit(0); // Use _exit instead of exit to avoid destructors
         default:
             fprintf(stderr, "Child process: Unknown command received: %d\n", (int)ch);
-            exit(5); // Exit with error for unknown command
+            _exit(5); // Use _exit instead of exit to avoid destructors
         }
     }
 }
@@ -1253,9 +1253,11 @@ BOOST_AUTO_TEST_CASE(test_LockDirectory)
     // has released the lock as we would expect by probing it.
     int processstatus;
     BOOST_CHECK_EQUAL(write(fd[1], &LockCommand, 1), 1);
+    BOOST_CHECK_EQUAL(read(fd[1], &ch, 1), 1);
+    BOOST_CHECK_EQUAL(ch, ResSuccess);
     BOOST_CHECK_EQUAL(write(fd[1], &ExitCommand, 1), 1);
     BOOST_CHECK_EQUAL(waitpid(pid, &processstatus, 0), pid);
-    BOOST_CHECK_EQUAL(processstatus, 0);
+    BOOST_CHECK_EQUAL(WEXITSTATUS(processstatus), 0);
     BOOST_CHECK_EQUAL(LockDirectory(dirname, lockname, true), LockResult::Success);
 
     BOOST_CHECK_EQUAL(close(fd[1]), 0); // Close our side of the socketpair
