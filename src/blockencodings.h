@@ -79,6 +79,29 @@ public:
     explicit BlockTransactions(const BlockTransactionsRequest& req) :
         blockhash(req.blockhash), txn(req.indexes.size()) {}
 
+    // Copy constructor
+    BlockTransactions(const BlockTransactions& other) = default;
+
+    // Move constructor
+    BlockTransactions(BlockTransactions&& other) noexcept
+        : blockhash(std::move(other.blockhash)),
+          txn(std::move(other.txn))
+    {
+    }
+
+    // Copy assignment
+    BlockTransactions& operator=(const BlockTransactions& other) = default;
+
+    // Move assignment
+    BlockTransactions& operator=(BlockTransactions&& other) noexcept
+    {
+        if (this != &other) {
+            blockhash = std::move(other.blockhash);
+            txn = std::move(other.txn);
+        }
+        return *this;
+    }
+
     ADD_SERIALIZE_METHODS;
 
     template <typename Stream, typename Operation>
@@ -150,6 +173,37 @@ public:
     CBlockHeaderAndShortTxIDs() {}
 
     CBlockHeaderAndShortTxIDs(const CBlock& block);
+
+    // Copy constructor
+    CBlockHeaderAndShortTxIDs(const CBlockHeaderAndShortTxIDs& other) = default;
+
+    // Move constructor
+    CBlockHeaderAndShortTxIDs(CBlockHeaderAndShortTxIDs&& other) noexcept
+        : shorttxidk0(other.shorttxidk0),
+          shorttxidk1(other.shorttxidk1),
+          nonce(other.nonce),
+          shorttxids(std::move(other.shorttxids)),
+          prefilledtxn(std::move(other.prefilledtxn)),
+          header(std::move(other.header))
+    {
+    }
+
+    // Copy assignment
+    CBlockHeaderAndShortTxIDs& operator=(const CBlockHeaderAndShortTxIDs& other) = default;
+
+    // Move assignment
+    CBlockHeaderAndShortTxIDs& operator=(CBlockHeaderAndShortTxIDs&& other) noexcept
+    {
+        if (this != &other) {
+            shorttxidk0 = other.shorttxidk0;
+            shorttxidk1 = other.shorttxidk1;
+            nonce = other.nonce;
+            shorttxids = std::move(other.shorttxids);
+            prefilledtxn = std::move(other.prefilledtxn);
+            header = std::move(other.header);
+        }
+        return *this;
+    }
 
     uint64_t GetShortID(const uint256& txhash) const;
 

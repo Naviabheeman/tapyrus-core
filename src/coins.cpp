@@ -101,7 +101,7 @@ void AddCoins(CCoinsViewCache& cache, const CTransaction &tx, int nHeight, bool 
         bool overwrite = check ? cache.HaveCoin(COutPoint(txid, i)) : fCoinbase;
         // Always set the possible_overwrite flag to AddCoin for coinbase txn, in order to correctly
         // deal with the pre-BIP30 occurrences of duplicate coinbase transactions.
-        cache.AddCoin(COutPoint(txid, i), Coin(tx.vout[i], nHeight, fCoinbase), overwrite);
+        cache.AddCoin(COutPoint(txid, i), Coin(std::move(tx.vout[i]), nHeight, fCoinbase), overwrite);
     }
 }
 
@@ -273,7 +273,7 @@ static const size_t MAX_OUTPUTS_PER_BLOCK = MAX_BLOCK_SIZE / MIN_TRANSACTION_OUT
 
 const Coin& AccessByTxid(const CCoinsViewCache& view, const uint256& txid)
 {
-    COutPoint iter(txid, 0);
+    COutPoint iter(std::move(txid), 0);
     while (iter.n < MAX_OUTPUTS_PER_BLOCK) {
         const Coin& alternate = view.AccessCoin(iter);
         if (!alternate.IsSpent()) return alternate;

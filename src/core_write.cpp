@@ -203,7 +203,7 @@ void TxToUniv(const CTransaction& tx, const uint256& hashBlock, UniValue& entry,
             in.pushKV("scriptSig", o);
         }
         in.pushKV("sequence", (int64_t)txin.nSequence);
-        vin.push_back(in);
+        vin.push_back(std::move(in));
     }
     entry.pushKV("vin", vin);
 
@@ -221,7 +221,7 @@ void TxToUniv(const CTransaction& tx, const uint256& hashBlock, UniValue& entry,
         UniValue o(UniValue::VOBJ);
         ScriptPubKeyToUniv(txout.scriptPubKey, o, true);
         out.pushKV("scriptPubKey", o);
-        vout.push_back(out);
+        vout.push_back(std::move(out));
     }
     entry.pushKV("vout", vout);
 

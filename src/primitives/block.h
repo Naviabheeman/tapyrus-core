@@ -126,6 +126,31 @@ public:
         *(static_cast<CBlockHeader*>(this)) = header;
     }
 
+    // Copy constructor
+    CBlock(const CBlock& other) = default;
+
+    // Move constructor
+    CBlock(CBlock&& other) noexcept
+        : CBlockHeader(std::move(other)),
+          vtx(std::move(other.vtx)),
+          fChecked(other.fChecked)
+    {
+    }
+
+    // Copy assignment
+    CBlock& operator=(const CBlock& other) = default;
+
+    // Move assignment
+    CBlock& operator=(CBlock&& other) noexcept
+    {
+        if (this != &other) {
+            CBlockHeader::operator=(std::move(other));
+            vtx = std::move(other.vtx);
+            fChecked = other.fChecked;
+        }
+        return *this;
+    }
+
     ADD_SERIALIZE_METHODS;
 
     template <typename Stream, typename Operation>
@@ -170,6 +195,27 @@ struct CBlockLocator
     CBlockLocator() {}
 
     explicit CBlockLocator(const std::vector<uint256>& vHaveIn) : vHave(vHaveIn) {}
+
+    // Copy constructor
+    CBlockLocator(const CBlockLocator& other) = default;
+
+    // Move constructor
+    CBlockLocator(CBlockLocator&& other) noexcept
+        : vHave(std::move(other.vHave))
+    {
+    }
+
+    // Copy assignment
+    CBlockLocator& operator=(const CBlockLocator& other) = default;
+
+    // Move assignment
+    CBlockLocator& operator=(CBlockLocator&& other) noexcept
+    {
+        if (this != &other) {
+            vHave = std::move(other.vHave);
+        }
+        return *this;
+    }
 
     ADD_SERIALIZE_METHODS;
 

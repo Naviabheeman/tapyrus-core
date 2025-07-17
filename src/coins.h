@@ -44,6 +44,31 @@ public:
     Coin(CTxOut&& outIn, int nHeightIn, bool fCoinBaseIn) : out(std::move(outIn)), fCoinBase(fCoinBaseIn), nHeight(nHeightIn) {}
     Coin(const CTxOut& outIn, int nHeightIn, bool fCoinBaseIn) : out(outIn), fCoinBase(fCoinBaseIn),nHeight(nHeightIn){}
 
+    // Copy constructor
+    Coin(const Coin& other) = default;
+
+    // Move constructor
+    Coin(Coin&& other) noexcept
+        : out(std::move(other.out)),
+          fCoinBase(other.fCoinBase),
+          nHeight(other.nHeight)
+    {
+    }
+
+    // Copy assignment
+    Coin& operator=(const Coin& other) = default;
+
+    // Move assignment
+    Coin& operator=(Coin&& other) noexcept
+    {
+        if (this != &other) {
+            out = std::move(other.out);
+            fCoinBase = other.fCoinBase;
+            nHeight = other.nHeight;
+        }
+        return *this;
+    }
+
     void Clear() {
         out.SetNull();
         fCoinBase = false;
@@ -119,6 +144,29 @@ struct CCoinsCacheEntry
 
     CCoinsCacheEntry() : flags(0) {}
     explicit CCoinsCacheEntry(Coin&& coin_) : coin(std::move(coin_)), flags(0) {}
+
+    // Copy constructor
+    CCoinsCacheEntry(const CCoinsCacheEntry& other) = default;
+
+    // Move constructor
+    CCoinsCacheEntry(CCoinsCacheEntry&& other) noexcept
+        : coin(std::move(other.coin)),
+          flags(other.flags)
+    {
+    }
+
+    // Copy assignment
+    CCoinsCacheEntry& operator=(const CCoinsCacheEntry& other) = default;
+
+    // Move assignment
+    CCoinsCacheEntry& operator=(CCoinsCacheEntry&& other) noexcept
+    {
+        if (this != &other) {
+            coin = std::move(other.coin);
+            flags = other.flags;
+        }
+        return *this;
+    }
 };
 
 typedef std::unordered_map<COutPoint, CCoinsCacheEntry, SaltedOutpointHasher> CCoinsMap;

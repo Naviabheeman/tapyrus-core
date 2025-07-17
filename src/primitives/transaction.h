@@ -28,6 +28,29 @@ public:
     COutPoint(): n((uint32_t) -1) { }
     COutPoint(const uint256& hashIn, uint32_t nIn): hashMalFix(hashIn), n(nIn) { }
 
+    // Copy constructor
+    COutPoint(const COutPoint& other) = default;
+
+    // Move constructor
+    COutPoint(COutPoint&& other) noexcept
+        : hashMalFix(std::move(other.hashMalFix)),
+          n(other.n)
+    {
+    }
+
+    // Copy assignment
+    COutPoint& operator=(const COutPoint& other) = default;
+
+    // Move assignment
+    COutPoint& operator=(COutPoint&& other) noexcept
+    {
+        if (this != &other) {
+            hashMalFix = std::move(other.hashMalFix);
+            n = other.n;
+        }
+        return *this;
+    }
+
     ADD_SERIALIZE_METHODS;
 
     template <typename Stream, typename Operation>
@@ -105,6 +128,33 @@ public:
     explicit CTxIn(COutPoint prevoutIn, CScript scriptSigIn=CScript(), uint32_t nSequenceIn=SEQUENCE_FINAL);
     CTxIn(uint256 hashPrevTx, uint32_t nOut, CScript scriptSigIn=CScript(), uint32_t nSequenceIn=SEQUENCE_FINAL);
 
+    // Copy constructor
+    CTxIn(const CTxIn& other) = default;
+
+    // Move constructor
+    CTxIn(CTxIn&& other) noexcept
+        : prevout(std::move(other.prevout)),
+          scriptSig(std::move(other.scriptSig)),
+          nSequence(other.nSequence),
+          scriptWitness(std::move(other.scriptWitness))
+    {
+    }
+
+    // Copy assignment
+    CTxIn& operator=(const CTxIn& other) = default;
+
+    // Move assignment
+    CTxIn& operator=(CTxIn&& other) noexcept
+    {
+        if (this != &other) {
+            prevout = std::move(other.prevout);
+            scriptSig = std::move(other.scriptSig);
+            nSequence = other.nSequence;
+            scriptWitness = std::move(other.scriptWitness);
+        }
+        return *this;
+    }
+
     ADD_SERIALIZE_METHODS;
 
     template <typename Stream, typename Operation>
@@ -147,6 +197,29 @@ public:
     }
 
     CTxOut(const CAmount& nValueIn, CScript scriptPubKeyIn);
+
+    // Copy constructor
+    CTxOut(const CTxOut& other) = default;
+
+    // Move constructor
+    CTxOut(CTxOut&& other) noexcept
+        : nValue(other.nValue),
+          scriptPubKey(std::move(other.scriptPubKey))
+    {
+    }
+
+    // Copy assignment
+    CTxOut& operator=(const CTxOut& other) = default;
+
+    // Move assignment
+    CTxOut& operator=(CTxOut&& other) noexcept
+    {
+        if (this != &other) {
+            nValue = other.nValue;
+            scriptPubKey = std::move(other.scriptPubKey);
+        }
+        return *this;
+    }
 
     ADD_SERIALIZE_METHODS;
 
@@ -328,6 +401,33 @@ struct CMutableTransaction
 
     CMutableTransaction();
     explicit CMutableTransaction(const CTransaction& tx);
+
+    // Copy constructor
+    CMutableTransaction(const CMutableTransaction& other) = default;
+
+    // Move constructor
+    CMutableTransaction(CMutableTransaction&& other) noexcept
+        : vin(std::move(other.vin)),
+          vout(std::move(other.vout)),
+          nFeatures(other.nFeatures),
+          nLockTime(other.nLockTime)
+    {
+    }
+
+    // Copy assignment
+    CMutableTransaction& operator=(const CMutableTransaction& other) = default;
+
+    // Move assignment
+    CMutableTransaction& operator=(CMutableTransaction&& other) noexcept
+    {
+        if (this != &other) {
+            vin = std::move(other.vin);
+            vout = std::move(other.vout);
+            nFeatures = other.nFeatures;
+            nLockTime = other.nLockTime;
+        }
+        return *this;
+    }
 
     template <typename Stream>
     inline void Serialize(Stream& s) const {
