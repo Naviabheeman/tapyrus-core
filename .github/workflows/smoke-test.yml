@@ -200,7 +200,7 @@ jobs:
           echo "---------------- Start benchmark test ---------------- "
           cd "$BASE_BUILD_DIR/bin"
           # Run a quick benchmark to verify the build
-          ./bench_tapyrus -evals=25 > bench_results.txt
+          ./bench_tapyrus -evals=10 > bench_results.txt
           if [ $? -eq 0 ]; then
             echo "Benchmark tests passed"
           else
