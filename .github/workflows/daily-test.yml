@@ -261,21 +261,53 @@ jobs:
           pip3 install pyzmq
 
       - name: Build Depends
-        if: matrix.config.use_depends && steps.depends-cache.outputs.cache-hit != 'true'
+        if: matrix.config.use_depends
         run: |
+          # Determine HOST based on platform and architecture
           if [ "${{ matrix.config.platform }}" == "macos" ]; then
-            make -C depends HOST=${{ matrix.config.arch }}-apple-darwin -j$(sysctl -n hw.ncpu)
+            export HOST="${{ matrix.config.arch }}-apple-darwin"
+            CPU_COUNT=$(sysctl -n hw.ncpu)
           else
             if [ "${{ matrix.config.arch }}" == "arm64" ]; then
               export HOST="aarch64-linux-gnu"
             else
               export HOST="${{ matrix.config.arch }}-linux-gnu"
             fi
-            make -C depends HOST=$HOST -j$(nproc)
+            CPU_COUNT=$(nproc)
           fi
+          
+          echo "Building depends for HOST=$HOST"
+          
+          # Check if depends is already built and valid
+          DEPENDS_PREFIX="$DEPENDS_DIR/$HOST"
+          if [ -d "$DEPENDS_PREFIX" ] && [ -f "$DEPENDS_PREFIX/lib/libboost_system.a" ]; then
+            echo "Depends appears to be already built, verifying..."
+            if [ -f "$DEPENDS_PREFIX/lib/pkgconfig/libevent.pc" ]; then
+              echo "✅ Depends verification passed, skipping build"
+            else
+              echo "⚠️ Depends verification failed, rebuilding..."
+              rm -rf "$DEPENDS_PREFIX"
+              make -C depends HOST=$HOST -j$CPU_COUNT
+            fi
+          else
+            echo "Building depends from scratch..."
+            make -C depends HOST=$HOST -j$CPU_COUNT
+          fi
+          
+          # Verify the build completed successfully
+          if [ ! -d "$DEPENDS_PREFIX" ]; then
+            echo "❌ Depends build failed: $DEPENDS_PREFIX not found"
+            exit 1
+          fi
+          
+          echo "✅ Depends build completed for $HOST"
+          echo "Contents of $DEPENDS_PREFIX:"
+          ls -la "$DEPENDS_PREFIX/" || true
+          echo "Libraries in $DEPENDS_PREFIX/lib:"
+          ls -la "$DEPENDS_PREFIX/lib/" | head -10 || true
 
       - name: Save Depends cache
-        if: matrix.config.use_depends && steps.depends-cache.outputs.cache-hit != 'true'
+        if: matrix.config.use_depends
         uses: actions/cache/save@v4
         with:
           path: ${{ env.DEPENDS_DIR }}
@@ -328,6 +360,16 @@ jobs:
               export HOST="${{ matrix.config.arch }}-linux-gnu"
             fi
             DEPENDS_PREFIX="$DEPENDS_DIR/$HOST"
+            
+            # Verify depends directory exists and has required files
+            if [ ! -d "$DEPENDS_PREFIX" ]; then
+              echo "Error: Depends directory $DEPENDS_PREFIX not found"
+              echo "Available directories in $DEPENDS_DIR:"
+              ls -la "$DEPENDS_DIR" || echo "Depends directory not found"
+              exit 1
+            fi
+            
+            echo "Using depends prefix: $DEPENDS_PREFIX"
             export PKG_CONFIG_PATH="$DEPENDS_PREFIX/lib/pkgconfig:$PKG_CONFIG_PATH"
             export LD_LIBRARY_PATH="$DEPENDS_PREFIX/lib:$LD_LIBRARY_PATH"
           fi
@@ -344,9 +386,8 @@ jobs:
             "-DENABLE_TESTS=ON"
           )
 
-          # Add depends prefix if using depends
+          # Set install prefix (following ci_cmake.yml pattern)
           if [ "${{ matrix.config.use_depends }}" == "true" ]; then
-            CMAKE_OPTS+=("-DCMAKE_PREFIX_PATH=$DEPENDS_PREFIX")
             CMAKE_OPTS+=("-DCMAKE_INSTALL_PREFIX=$DEPENDS_PREFIX")
           fi
 
@@ -360,12 +401,12 @@ jobs:
           # Add platform-specific options
           CMAKE_OPTS+=("-DCMAKE_CXX_FLAGS=-Wno-error=unused-member-function")
           
-          # Configure Boost
+          # Configure Boost and other dependencies  
           if [ "${{ matrix.config.use_depends }}" == "true" ]; then
+            # Use depends-built libraries (following ci_cmake.yml pattern)
             CMAKE_OPTS+=("-DBOOST_ROOT=$DEPENDS_PREFIX")
             CMAKE_OPTS+=("-DBOOST_INCLUDEDIR=$DEPENDS_PREFIX/include")
             CMAKE_OPTS+=("-DBOOST_LIBRARYDIR=$DEPENDS_PREFIX/lib")
-            CMAKE_OPTS+=("--toolchain=$DEPENDS_PREFIX/toolchain.cmake")
           else
             if [ "${{ matrix.config.platform }}" == "macos" ]; then
               CMAKE_OPTS+=("-DBOOST_ROOT=/opt/homebrew/opt/boost")
@@ -380,6 +421,13 @@ jobs:
           fi
 
           # Configure and build
+          echo "CMake configuration options:"
+          printf '%s\n' "${CMAKE_OPTS[@]}"
+          
+          echo "Environment variables:"
+          echo "PKG_CONFIG_PATH=$PKG_CONFIG_PATH"
+          echo "LD_LIBRARY_PATH=$LD_LIBRARY_PATH"
+          
           cmake -S "$BASE_ROOT_DIR" -B "$BASE_BUILD_DIR" "${CMAKE_OPTS[@]}"
           cmake -DCMAKE_POLICY_DEFAULT_CMP0144=NEW "$BASE_BUILD_DIR"
           mkdir -p "$BASE_BUILD_DIR/src/secp256k1/src"
@@ -554,22 +602,3 @@ jobs:
           name: daily-core-dumps-${{ matrix.config.name }}
           path: ${{ github.workspace }}/core_dumps/
           retention-days: 7
-
-  notify-results:
-    name: Notify Test Results
-    runs-on: ubuntu-latest
-    needs: daily-test
-    if: always()
-    steps:
-      - name: Check test results
-        run: |
-          echo "daily test results:"
-          echo "======================"
-          if [ "${{ needs.daily-test.result }}" == "success" ]; then
-            echo "✅ All daily tests passed successfully!"
-            echo "Test results are available by 8 AM JST as requested."
-          else
-            echo "❌ Some daily tests failed."
-            echo "Please check the individual job results for details."
-            exit 1
-          fi
