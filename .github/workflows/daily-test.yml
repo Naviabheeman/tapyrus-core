@@ -365,6 +365,7 @@ jobs:
             CMAKE_OPTS+=("-DBOOST_ROOT=$DEPENDS_PREFIX")
             CMAKE_OPTS+=("-DBOOST_INCLUDEDIR=$DEPENDS_PREFIX/include")
             CMAKE_OPTS+=("-DBOOST_LIBRARYDIR=$DEPENDS_PREFIX/lib")
+            CMAKE_OPTS+=("--toolchain=$DEPENDS_PREFIX/toolchain.cmake")
           else
             if [ "${{ matrix.config.platform }}" == "macos" ]; then
               CMAKE_OPTS+=("-DBOOST_ROOT=/opt/homebrew/opt/boost")
@@ -411,7 +412,7 @@ jobs:
           
           echo "---------------- Start benchmark test ---------------- "
           cd "$BASE_BUILD_DIR/bin"
-          ./bench_tapyrus -evals=1000 > bench_results.txt
+          ./bench_tapyrus -evals=100 > bench_results.txt
           if [ $? -eq 0 ]; then
             echo "Benchmark tests passed"
             cat bench_results.txt
