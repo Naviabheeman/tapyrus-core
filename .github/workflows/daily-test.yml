@@ -1,0 +1,570 @@
+# Copyright (c) 2023-present The Bitcoin Core developers
+# Copyright (c) 2025 Chaintope Inc.
+# Distributed under the MIT software license, see the accompanying
+# file COPYING or http://www.opensource.org/licenses/mit-license.php.
+
+name: Cmake Daily Test
+
+on:
+  schedule:
+    # Run daily at 3 AM JST (6 PM UTC previous day)
+    - cron: '0 18 * * *'
+  workflow_dispatch:
+    inputs:
+      test_branch:
+        description: 'Branch to test (default: current default branch)'
+        type: string
+        default: ''
+        required: false
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CI_FAILFAST_TEST_LEAVE_DANGLING: 1
+  CTEST_OUTPUT_ON_FAILURE: 'ON'
+  CMAKE_BUILD_PARALLEL_LEVEL: 4
+  LC_ALL: C.UTF-8
+  BOOST_TEST_RANDOM: 1
+
+jobs:
+  daily-test:
+    strategy:
+      fail-fast: false
+      matrix:
+        config:
+          # Linux configurations with feature combinations
+          - name: Linux x86_64 - GUI + USDT + Wallet + Debug
+            os: ubuntu-24.04
+            arch: x86_64
+            compiler: clang
+            platform: linux
+            build_type: Debug
+            enable_gui: true
+            enable_usdt: true
+            enable_wallet: true
+            use_depends: true
+          - name: Linux x86_64 - GUI + Wallet + Release
+            os: ubuntu-24.04
+            arch: x86_64
+            compiler: clang
+            platform: linux
+            build_type: RelWithDebInfo
+            enable_gui: true
+            enable_usdt: false
+            enable_wallet: true
+            use_depends: true
+          - name: Linux x86_64 - USDT + Wallet + Release
+            os: ubuntu-24.04
+            arch: x86_64
+            compiler: clang
+            platform: linux
+            build_type: RelWithDebInfo
+            enable_gui: false
+            enable_usdt: true
+            enable_wallet: true
+            use_depends: true
+          - name: Linux x86_64 - No GUI + No Wallet + Release
+            os: ubuntu-24.04
+            arch: x86_64
+            compiler: clang
+            platform: linux
+            build_type: RelWithDebInfo
+            enable_gui: false
+            enable_usdt: false
+            enable_wallet: false
+            use_depends: true
+          - name: Linux ARM64 - GUI + USDT + Wallet + Debug
+            os: ubuntu-24.04
+            arch: arm64
+            compiler: clang
+            platform: linux
+            build_type: Debug
+            enable_gui: true
+            enable_usdt: true
+            enable_wallet: true
+            use_depends: true
+          - name: Linux ARM64 - Wallet + Release
+            os: ubuntu-24.04
+            arch: arm64
+            compiler: clang
+            platform: linux
+            build_type: RelWithDebInfo
+            enable_gui: false
+            enable_usdt: false
+            enable_wallet: true
+            use_depends: true
+          - name: Linux ARM64 - No GUI + No Wallet + Release
+            os: ubuntu-24.04
+            arch: arm64
+            compiler: clang
+            platform: linux
+            build_type: RelWithDebInfo
+            enable_gui: false
+            enable_usdt: false
+            enable_wallet: false
+            use_depends: true
+          # macOS configurations with feature combinations
+          - name: macOS x86_64 - GUI + USDT + Wallet + Debug
+            os: macos-14
+            arch: x86_64
+            compiler: clang
+            platform: macos
+            build_type: Debug
+            enable_gui: true
+            enable_usdt: true
+            enable_wallet: true
+            use_depends: true
+          - name: macOS x86_64 - GUI + Wallet + Release
+            os: macos-14
+            arch: x86_64
+            compiler: clang
+            platform: macos
+            build_type: RelWithDebInfo
+            enable_gui: true
+            enable_usdt: false
+            enable_wallet: true
+            use_depends: true
+          - name: macOS x86_64 - No GUI + No Wallet + Release
+            os: macos-14
+            arch: x86_64
+            compiler: clang
+            platform: macos
+            build_type: RelWithDebInfo
+            enable_gui: false
+            enable_usdt: false
+            enable_wallet: false
+            use_depends: true
+          - name: macOS ARM64 - GUI + USDT + Wallet + Debug
+            os: macos-14
+            arch: arm64
+            compiler: clang
+            platform: macos
+            build_type: Debug
+            enable_gui: true
+            enable_usdt: true
+            enable_wallet: true
+            use_depends: true
+          - name: macOS ARM64 - Wallet + Release
+            os: macos-14
+            arch: arm64
+            compiler: clang
+            platform: macos
+            build_type: RelWithDebInfo
+            enable_gui: false
+            enable_usdt: false
+            enable_wallet: true
+            use_depends: true
+          - name: macOS ARM64 - No GUI + No Wallet + Release
+            os: macos-14
+            arch: arm64
+            compiler: clang
+            platform: macos
+            build_type: RelWithDebInfo
+            enable_gui: false
+            enable_usdt: false
+            enable_wallet: false
+            use_depends: true
+
+    name: ${{ matrix.config.name }}
+    runs-on: ${{ matrix.config.os }}
+    timeout-minutes: 480  # 8 hours timeout for daily tests
+    env:
+      BASE_ROOT_DIR: ${{ github.workspace }}
+      CCACHE_DIR: ${{ github.workspace }}/ccache
+      BASE_BUILD_DIR: ${{ github.workspace }}/build
+      DEPENDS_DIR: ${{ github.workspace }}/depends
+      CC: ${{ matrix.config.compiler }}
+      CXX: ${{ matrix.config.compiler }}++
+      LC_ALL: C.UTF-8
+      BOOST_TEST_RANDOM: 1
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.test_branch || github.ref }}
+          submodules: recursive
+
+      - name: Restore Ccache cache
+        id: ccache-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: daily-${{ matrix.config.platform }}-${{ matrix.config.arch }}-${{ matrix.config.build_type }}-${{ matrix.config.enable_gui }}-${{ matrix.config.enable_usdt }}-${{ matrix.config.enable_wallet }}-ccache-${{ github.run_id }}
+          restore-keys: daily-${{ matrix.config.platform }}-${{ matrix.config.arch }}-${{ matrix.config.build_type }}-${{ matrix.config.enable_gui }}-${{ matrix.config.enable_usdt }}-${{ matrix.config.enable_wallet }}-ccache-
+
+      - name: Restore Depends cache
+        if: matrix.config.use_depends
+        id: depends-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ env.DEPENDS_DIR }}
+          key: depends-${{ matrix.config.platform }}-${{ matrix.config.arch }}-${{ matrix.config.enable_gui }}-${{ hashFiles('depends/packages/*') }}
+          restore-keys: depends-${{ matrix.config.platform }}-${{ matrix.config.arch }}-${{ matrix.config.enable_gui }}-
+
+      - name: Restore Benchmark History cache
+        if: (matrix.config.platform == 'linux' && matrix.config.arch == 'x86_64') || (matrix.config.platform == 'macos' && matrix.config.arch == 'arm64')
+        id: benchmark-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ github.workspace }}/benchmark_results/data
+          key: benchmark-history-${{ matrix.config.platform }}-${{ matrix.config.arch }}-${{ github.run_id }}
+          restore-keys: benchmark-history-${{ matrix.config.platform }}-${{ matrix.config.arch }}-
+
+      - name: Setup Linux Dependencies
+        if: matrix.config.platform == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang ccache build-essential cmake pkgconf python3-zmq libevent-dev bsdmainutils libboost-filesystem-dev libboost-test-dev libdb5.3++-dev libminiupnpc-dev libzmq3-dev libqrencode-dev systemtap-sdt-dev bpfcc-tools bpftrace python3-venv valgrind
+          if [ "${{ matrix.config.enable_gui }}" == "true" ]; then
+            sudo apt-get install -y qtbase5-dev qttools5-dev-tools
+          fi
+          python3 -m venv $HOME/venv
+          source $HOME/venv/bin/activate
+          pip3 install pyzmq
+
+      - name: Setup macOS Dependencies
+        if: matrix.config.platform == 'macos'
+        env:
+          HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK: 1
+        run: |
+          if [ -d "/Applications/Xcode_15.0.app" ]; then
+            sudo xcode-select --switch /Applications/Xcode_15.0.app
+          else
+            echo "Xcode 15.0 not found, skipping xcode-select"
+          fi
+          clang --version
+          brew install --quiet python@3 || brew link --overwrite python@3
+          # Try berkeley-db@4 first, fall back to berkeley-db
+          if brew install --quiet berkeley-db@4 2>/dev/null; then
+            echo "Installed berkeley-db@4"
+          else
+            brew install --quiet berkeley-db
+            echo "Installed berkeley-db (will use --with-incompatible-bdb)"
+          fi
+          brew install --quiet coreutils ninja pkgconf gnu-getopt ccache boost libevent zeromq qrencode
+          if [ "${{ matrix.config.enable_gui }}" == "true" ]; then
+            brew install --quiet qt@5
+          fi
+          echo 'export PATH="/opt/homebrew/bin:$PATH"' >> $HOME/.bashrc
+          echo 'export BOOST_ROOT="/opt/homebrew/opt/boost"' >> $HOME/.bashrc
+          echo 'export BOOST_INCLUDEDIR="/opt/homebrew/opt/boost/include"' >> $HOME/.bashrc
+          echo 'export BOOST_LIBRARYDIR="/opt/homebrew/opt/boost/lib"' >> $HOME/.bashrc
+          source $HOME/.bashrc
+          python3 -m venv $HOME/venv
+          source $HOME/venv/bin/activate
+          pip3 install pyzmq
+
+      - name: Build Depends
+        if: matrix.config.use_depends && steps.depends-cache.outputs.cache-hit != 'true'
+        run: |
+          if [ "${{ matrix.config.platform }}" == "macos" ]; then
+            make -C depends HOST=${{ matrix.config.arch }}-apple-darwin -j$(sysctl -n hw.ncpu)
+          else
+            if [ "${{ matrix.config.arch }}" == "arm64" ]; then
+              export HOST="aarch64-linux-gnu"
+            else
+              export HOST="${{ matrix.config.arch }}-linux-gnu"
+            fi
+            make -C depends HOST=$HOST -j$(nproc)
+          fi
+
+      - name: Save Depends cache
+        if: matrix.config.use_depends && steps.depends-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ env.DEPENDS_DIR }}
+          key: depends-${{ matrix.config.platform }}-${{ matrix.config.arch }}-${{ matrix.config.enable_gui }}-${{ hashFiles('depends/packages/*') }}
+
+      - name: Save Benchmark History cache
+        if: always() && ((matrix.config.platform == 'linux' && matrix.config.arch == 'x86_64') || (matrix.config.platform == 'macos' && matrix.config.arch == 'arm64'))
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ github.workspace }}/benchmark_results/data
+          key: benchmark-history-${{ matrix.config.platform }}-${{ matrix.config.arch }}-${{ github.run_id }}
+
+      - name: Enable core dumps
+        run: |
+          CORE_DUMP_DIR="${{ github.workspace }}/core_dumps"
+          mkdir -p "$CORE_DUMP_DIR"
+          chmod 777 "$CORE_DUMP_DIR"
+          if [ "${{ matrix.config.platform }}" == "linux" ]; then
+            sudo sysctl -w kernel.core_pattern="$CORE_DUMP_DIR/core.%e.%p"
+          else
+            sudo sysctl -w kern.corefile="$CORE_DUMP_DIR/core.%N"
+          fi
+          echo "Core dumps will be stored in: $CORE_DUMP_DIR"
+          ulimit -c unlimited
+          TEST_DIR="${{ github.workspace }}/tapyrus_test"
+          mkdir -p "$TEST_DIR"
+          chmod -R 777 "$TEST_DIR"
+          echo "TAPYRUS_TEST_DIR=$TEST_DIR" >> $GITHUB_ENV
+
+      - name: Build and run daily tests
+        env:
+          TAPYRUS_TEST_DIR: ${{ env.TAPYRUS_TEST_DIR }}
+        run: |
+          if [ "${{ matrix.config.platform }}" == "macos" ]; then
+            CPU_COUNT=$(sysctl -n hw.ncpu)
+          else
+            CPU_COUNT=$(nproc)
+          fi
+
+          # Create dummy .tapyrus file to prevent default datadir from being used
+          echo ">" $HOME/.tapyrus
+
+          # Set up depends path if using depends
+          if [ "${{ matrix.config.use_depends }}" == "true" ]; then
+            if [ "${{ matrix.config.platform }}" == "macos" ]; then
+              export HOST="${{ matrix.config.arch }}-apple-darwin"
+            elif [ "${{ matrix.config.arch }}" == "arm64" ]; then
+              export HOST="aarch64-linux-gnu"
+            else
+              export HOST="${{ matrix.config.arch }}-linux-gnu"
+            fi
+            DEPENDS_PREFIX="$DEPENDS_DIR/$HOST"
+            export PKG_CONFIG_PATH="$DEPENDS_PREFIX/lib/pkgconfig:$PKG_CONFIG_PATH"
+            export LD_LIBRARY_PATH="$DEPENDS_PREFIX/lib:$LD_LIBRARY_PATH"
+          fi
+
+          # Common CMake configuration options
+          CMAKE_OPTS=(
+            "-DENABLE_ZMQ=ON"
+            "-DENABLE_GUI=${{ matrix.config.enable_gui }}"
+            "-DENABLE_BENCH=ON"
+            "-DWITH_BDB=${{ matrix.config.enable_wallet }}"
+            "-DENABLE_WALLET=${{ matrix.config.enable_wallet }}"
+            "-DENABLE_TRACING=${{ matrix.config.enable_usdt }}"
+            "-DCMAKE_BUILD_TYPE=${{ matrix.config.build_type }}"
+            "-DENABLE_TESTS=ON"
+          )
+
+          # Add depends prefix if using depends
+          if [ "${{ matrix.config.use_depends }}" == "true" ]; then
+            CMAKE_OPTS+=("-DCMAKE_PREFIX_PATH=$DEPENDS_PREFIX")
+            CMAKE_OPTS+=("-DCMAKE_INSTALL_PREFIX=$DEPENDS_PREFIX")
+          fi
+
+          # Disable BDB version warning for macOS if using newer version
+          if [ "${{ matrix.config.platform }}" == "macos" ]; then
+            if ! brew list berkeley-db@4 &>/dev/null; then
+              CMAKE_OPTS+=("-DWARN_INCOMPATIBLE_BDB=OFF")
+            fi
+          fi
+
+          # Add platform-specific options
+          CMAKE_OPTS+=("-DCMAKE_CXX_FLAGS=-Wno-error=unused-member-function")
+          
+          # Configure Boost
+          if [ "${{ matrix.config.use_depends }}" == "true" ]; then
+            CMAKE_OPTS+=("-DBOOST_ROOT=$DEPENDS_PREFIX")
+            CMAKE_OPTS+=("-DBOOST_INCLUDEDIR=$DEPENDS_PREFIX/include")
+            CMAKE_OPTS+=("-DBOOST_LIBRARYDIR=$DEPENDS_PREFIX/lib")
+          else
+            if [ "${{ matrix.config.platform }}" == "macos" ]; then
+              CMAKE_OPTS+=("-DBOOST_ROOT=/opt/homebrew/opt/boost")
+              CMAKE_OPTS+=("-DBOOST_INCLUDEDIR=/opt/homebrew/opt/boost/include")
+              CMAKE_OPTS+=("-DBOOST_LIBRARYDIR=/opt/homebrew/opt/boost/lib")
+              CMAKE_OPTS+=("-DCMAKE_PREFIX_PATH=/opt/homebrew/opt/boost")
+            else
+              CMAKE_OPTS+=("-DBOOST_ROOT=/usr")
+              CMAKE_OPTS+=("-DBOOST_INCLUDEDIR=/usr/include")
+              CMAKE_OPTS+=("-DBOOST_LIBRARYDIR=/usr/lib/x86_64-linux-gnu")
+            fi
+          fi
+
+          # Configure and build
+          cmake -S "$BASE_ROOT_DIR" -B "$BASE_BUILD_DIR" "${CMAKE_OPTS[@]}"
+          cmake -DCMAKE_POLICY_DEFAULT_CMP0144=NEW "$BASE_BUILD_DIR"
+          mkdir -p "$BASE_BUILD_DIR/src/secp256k1/src"
+          cmake --build "$BASE_BUILD_DIR" --parallel -j "$CPU_COUNT" --target all
+
+          # Set library path for depends builds
+          if [ "${{ matrix.config.use_depends }}" == "true" ]; then
+            export LD_LIBRARY_PATH="$DEPENDS_PREFIX/lib:$LD_LIBRARY_PATH"
+          fi
+
+          # Run daily test suite
+          export CTEST_OUTPUT_ON_FAILURE=ON
+
+          echo "---------------- Start unit test ---------------- "
+          cd "$BASE_BUILD_DIR/bin"
+          if [ "${{ matrix.config.platform }}" == "linux" ]; then
+            valgrind ./test_tapyrus --log_level=test_suite --report_level=short --build_info --catch_system_errors
+          else
+            ./test_tapyrus --log_level=test_suite --report_level=short --build_info --catch_system_errors
+          fi
+          
+          echo "---------------- Start util test ---------------- "
+          cd "$BASE_ROOT_DIR"
+          if python3 test/util/tapyrus-util-test.py; then
+            echo "Util tests passed"
+          else
+            echo "Util tests failed"
+            exit 1
+          fi
+          
+          echo "---------------- Start benchmark test ---------------- "
+          cd "$BASE_BUILD_DIR/bin"
+          ./bench_tapyrus -evals=1000 > bench_results.txt
+          if [ $? -eq 0 ]; then
+            echo "Benchmark tests passed"
+            cat bench_results.txt
+          else
+            echo "Benchmark tests failed"
+            exit 1
+          fi
+          
+          # Collect detailed benchmark data and generate trends for key platforms
+          if [[ ("${{ matrix.config.platform }}" == "linux" && "${{ matrix.config.arch }}" == "x86_64") || 
+                ("${{ matrix.config.platform }}" == "macos" && "${{ matrix.config.arch }}" == "arm64") ]]; then
+            echo "---------------- Collecting benchmark trend data for ${{ matrix.config.platform }} ${{ matrix.config.arch }} ---------------- "
+            cd "$BASE_ROOT_DIR"
+            
+            # Setup benchmark analysis environment
+            mkdir -p benchmark_results/data benchmark_results/plots
+            
+            # Install required Python packages
+            python3 -m pip install matplotlib --user --quiet || echo "Warning: matplotlib installation failed"
+            
+            # Run comprehensive benchmark data collection (longer duration for trends)
+            if python3 test/benchmark/collect_bench_data.py \
+              --build-dir "$BASE_BUILD_DIR" \
+              --output-dir benchmark_results/data \
+              --min-time 10000; then
+              echo "✅ Benchmark data collection dailyd"
+            else
+              echo "⚠️ Benchmark data collection failed, continuing..."
+            fi
+            
+            # Generate trend analysis if we have historical data
+            if find benchmark_results/data -name "bench_data_*.json" | head -1 > /dev/null; then
+              echo "Generating benchmark trend analysis..."
+              if python3 test/benchmark/plot_bench_trends.py \
+                --data-dir benchmark_results/data \
+                --output-dir benchmark_results/plots \
+                --platform ${{ matrix.config.platform == 'linux' && 'Linux' || 'Darwin' }} \
+                --arch ${{ matrix.config.arch }} \
+                --days-back 30; then
+                echo "✅ Benchmark trend analysis dailyd"
+              else
+                echo "⚠️ Benchmark trend analysis failed, continuing..."
+              fi
+            else
+              echo "No historical benchmark data found for trend analysis"
+            fi
+          else
+            echo "Skipping detailed benchmark analysis for ${{ matrix.config.platform }} ${{ matrix.config.arch }}"
+          fi
+          
+          echo "---------------- Start daily functional test suite ---------------- "
+          cd "$BASE_ROOT_DIR"
+          # Run the daily functional test suite including long-running tests
+          if python3 test/functional/test_runner.py --tmpdir="$TAPYRUS_TEST_DIR" -j 1 --combinedlogslen=4000 --coverage --failfast --quiet --extended; then
+            echo "daily functional tests passed"
+          else
+            echo "daily functional tests failed"
+            exit 1
+          fi
+          
+          echo "---------------- DAILY TEST FINISHED ---------------------"
+
+      - name: Save Ccache cache
+        uses: actions/cache/save@v4
+        if: steps.ccache-cache.outputs.cache-hit != 'true'
+        with:
+          path: ${{ env.CCACHE_DIR }}
+          key: daily-${{ matrix.config.platform }}-${{ matrix.config.arch }}-${{ matrix.config.build_type }}-${{ matrix.config.enable_gui }}-${{ matrix.config.enable_usdt }}-${{ matrix.config.enable_wallet }}-ccache-${{ github.run_id }}
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: daily-test-results-${{ matrix.config.name }}
+          path: |
+            ${{ github.workspace }}/tapyrus_test
+            ${{ github.workspace }}/build/bin/bench_results.txt
+            ${{ github.workspace }}/test/functional/test_framework/test_framework.log
+          retention-days: 30
+
+      - name: Upload benchmark analysis results
+        if: always() && ((matrix.config.platform == 'linux' && matrix.config.arch == 'x86_64') || (matrix.config.platform == 'macos' && matrix.config.arch == 'arm64'))
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-analysis-${{ matrix.config.platform }}-${{ matrix.config.arch }}
+          path: |
+            ${{ github.workspace }}/benchmark_results/
+          retention-days: 90
+
+      - name: Upload coverage data
+        if: matrix.config.build_type == 'Debug'
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-data-${{ matrix.config.name }}
+          path: |
+            ${{ github.workspace }}/.coverage
+            ${{ github.workspace }}/test/functional/coverage_html
+          retention-days: 30
+
+      - name: Debug Core Dump (if exists)
+        if: failure()
+        run: |
+          if [ "${{ matrix.config.platform }}" == "linux" ]; then
+            COREFILE=$(coredumpctl list --no-pager --output json | jq -r '.[0].filename')
+            if [ -f "$COREFILE" ]; then
+              echo "Found core dump: $COREFILE"
+              if command -v coredumpctl &> /dev/null; then
+                BINARY=$(coredumpctl info --no-pager | grep "Executable" | awk '{print $2}')
+              else
+                BINARY=$(file "$COREFILE" | awk -F"'" '{print $2}')
+              fi
+              if [ -x "$BINARY" ]; then
+                echo "Detected crashed binary: $BINARY"
+              else
+                echo "Could not detect crashed binary, using tapyrusd as default"
+                BINARY="./tapyrusd"
+              fi
+              gdb -batch -ex "bt" -ex "quit" "$BINARY" "$COREFILE"
+            fi
+          else
+            COREFILE=$(ls -t ${{ github.workspace }}/core_dumps/core.* 2>/dev/null | head -n 1)
+            if [ -f "$COREFILE" ]; then
+              echo "Found core dump: $COREFILE"
+              BINARY=$(file "$COREFILE" | awk -F"'" '{print $2}')
+              if [ -x "$BINARY" ]; then
+                echo "Detected crashed binary: $BINARY"
+              else
+                echo "Could not detect crashed binary, using tapyrusd as default"
+                BINARY="./tapyrusd"
+              fi
+              lldb -c "$COREFILE" -o "bt" -o "quit" -- "$BINARY"
+            fi
+          fi
+
+      - name: Upload Core Dumps
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: daily-core-dumps-${{ matrix.config.name }}
+          path: ${{ github.workspace }}/core_dumps/
+          retention-days: 7
+
+  notify-results:
+    name: Notify Test Results
+    runs-on: ubuntu-latest
+    needs: daily-test
+    if: always()
+    steps:
+      - name: Check test results
+        run: |
+          echo "daily test results:"
+          echo "======================"
+          if [ "${{ needs.daily-test.result }}" == "success" ]; then
+            echo "✅ All daily tests passed successfully!"
+            echo "Test results are available by 8 AM JST as requested."
+          else
+            echo "❌ Some daily tests failed."
+            echo "Please check the individual job results for details."
+            exit 1
+          fi
