@@ -223,8 +223,8 @@ target_link_libraries(tapyrus_server
     leveldb
     univalue
     Boost::headers
-    $<TARGET_NAME_IF_EXISTS:libevent::core>
     $<TARGET_NAME_IF_EXISTS:libevent::extra>
+    $<TARGET_NAME_IF_EXISTS:libevent::core>
     $<TARGET_NAME_IF_EXISTS:libevent::pthreads>
     $<TARGET_NAME_IF_EXISTS:USDT::headers>
 )
@@ -286,8 +286,8 @@ if(BUILD_CLI)
     tapyrus_cli
     tapyrus_util
     tapyrus_common
-    libevent::core
     libevent::extra
+    libevent::core
     Boost::headers
   )
   install_binary_component(tapyrus-cli HAS_MANPAGE)

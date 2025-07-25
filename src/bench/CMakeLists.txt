@@ -32,8 +32,8 @@ target_link_libraries(bench_tapyrus
   tapyrus_consensus
   $<TARGET_NAME_IF_EXISTS:tapyrus_zmq>
   Boost::headers
-  $<TARGET_NAME_IF_EXISTS:libevent::core>
   $<TARGET_NAME_IF_EXISTS:libevent::extra>
+  $<TARGET_NAME_IF_EXISTS:libevent::core>
   $<TARGET_NAME_IF_EXISTS:libevent::pthreads>
 )
 
