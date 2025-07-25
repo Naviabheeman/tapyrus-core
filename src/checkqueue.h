@@ -78,9 +78,12 @@ private:
                 if (nNow) {
                     fAllOk &= fOk;
                     nTodo -= nNow;
-                    if (nTodo == 0 && !fMaster)
+                    if (nTodo == 0 && !fMaster) {
                         // We processed the last element; inform the master it can exit and return the result
                         condMaster.notify_one();
+                        // Also notify workers in case of race condition
+                        condWorker.notify_all();
+                    }
                 } else {
                     // first iteration
                     nTotal++;
@@ -171,10 +174,13 @@ public:
             nTodo += vChecks.size();
         }
 
-        if (vChecks.size() == 1)
+        if (vChecks.size() == 1) {
             condWorker.notify_one();
-        else if (vChecks.size() > 1)
+            condMaster.notify_one();
+        } else if (vChecks.size() > 1) {
             condWorker.notify_all();
+            condMaster.notify_one();
+        }
     }
 
     //! Stop all of the worker threads.
