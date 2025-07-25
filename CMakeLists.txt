@@ -427,6 +427,11 @@ else()
   try_append_cxx_flags("-Wdeprecated-declarations" TARGET warn_interface SKIP_LINK
     IF_CHECK_PASSED "-Wno-deprecated-declarations"
   )
+
+  # Suppress gnu-zero-variadic-macro-arguments warnings from USDT tracing macros
+  try_append_cxx_flags("-Wgnu-zero-variadic-macro-arguments" TARGET warn_interface SKIP_LINK
+    IF_CHECK_PASSED "-Wno-gnu-zero-variadic-macro-arguments"
+  )
 endif()
 
 configure_file(cmake/script/Coverage.cmake Coverage.cmake USE_SOURCE_PERMISSIONS COPYONLY)
