@@ -51,7 +51,7 @@ class BenchmarkTrendAnalyzer:
         loaded_data = []
         for file_path in data_files:
             try:
-                with open(file_path, 'r') as f:
+                with open(file_path, 'r', encoding='utf8') as f:
                     data = json.load(f)
                     
                 # Filter by date if needed
@@ -295,7 +295,7 @@ class BenchmarkTrendAnalyzer:
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         report_file = self.output_dir / f"benchmark_summary_{platform}_{arch}_{timestamp}.txt"
         
-        with open(report_file, 'w') as f:
+        with open(report_file, 'w', encoding='utf8') as f:
             f.write('\n'.join(report_lines))
             
         print(f"Summary report saved to {report_file}")

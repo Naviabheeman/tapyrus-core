@@ -35,7 +35,7 @@ class BenchmarkCollector:
         
         try:
             print(f"Running benchmark with min-time={min_time}ms...")
-            with open(output_file, 'w') as f:
+            with open(output_file, 'w', encoding='utf8') as f:
                 result = subprocess.run([
                     str(bench_exe),
                     f"-min-time={min_time}",
@@ -67,7 +67,7 @@ class BenchmarkCollector:
         }
         
         try:
-            with open(output_file, 'r') as f:
+            with open(output_file, 'r', encoding='utf8') as f:
                 content = f.read()
                 
             # Parse CSV-style output from bench_tapyrus
@@ -118,7 +118,7 @@ class BenchmarkCollector:
         filename = f"bench_data_{platform}_{arch}_{timestamp}.json"
         output_file = self.output_dir / filename
         
-        with open(output_file, 'w') as f:
+        with open(output_file, 'w', encoding='utf8') as f:
             json.dump(data, f, indent=2)
             
         print(f"Structured benchmark data saved to {output_file}")
