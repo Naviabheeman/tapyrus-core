@@ -280,23 +280,39 @@ jobs:
           
           # Check if depends is already built and valid
           DEPENDS_PREFIX="$DEPENDS_DIR/$HOST"
-          if [ -d "$DEPENDS_PREFIX" ] && [ -f "$DEPENDS_PREFIX/lib/libboost_system.a" ]; then
+          if [ -d "$DEPENDS_PREFIX" ] && [ -d "$DEPENDS_PREFIX/lib" ] && [ -d "$DEPENDS_PREFIX/include" ]; then
             echo "Depends appears to be already built, verifying..."
-            if [ -f "$DEPENDS_PREFIX/lib/pkgconfig/libevent.pc" ]; then
+            # Check for key libraries that should exist in a successful depends build
+            if [ -f "$DEPENDS_PREFIX/lib/libboost_system.a" ] || [ -f "$DEPENDS_PREFIX/lib/libQt5Core.so" ] || [ -f "$DEPENDS_PREFIX/lib/libevent.a" ]; then
               echo "✅ Depends verification passed, skipping build"
             else
-              echo "⚠️ Depends verification failed, rebuilding..."
+              echo "⚠️ Depends verification failed (no key libraries found), rebuilding..."
               rm -rf "$DEPENDS_PREFIX"
-              make -C depends HOST=$HOST -j$CPU_COUNT
+              if ! make -C depends HOST=$HOST -j$CPU_COUNT; then
+                echo "❌ Depends rebuild failed during make"
+                exit 1
+              fi
             fi
           else
             echo "Building depends from scratch..."
-            make -C depends HOST=$HOST -j$CPU_COUNT
+            if ! make -C depends HOST=$HOST -j$CPU_COUNT; then
+              echo "❌ Depends build failed during make"
+              exit 1
+            fi
           fi
           
           # Verify the build completed successfully
-          if [ ! -d "$DEPENDS_PREFIX" ]; then
-            echo "❌ Depends build failed: $DEPENDS_PREFIX not found"
+          if [ ! -d "$DEPENDS_PREFIX" ] || [ ! -d "$DEPENDS_PREFIX/lib" ]; then
+            echo "❌ Depends build failed: $DEPENDS_PREFIX or lib directory not found"
+            exit 1
+          fi
+          
+          # Additional verification - check that we have some libraries
+          LIB_COUNT=$(find "$DEPENDS_PREFIX/lib" -name "*.a" -o -name "*.so*" | wc -l)
+          if [ "$LIB_COUNT" -lt 5 ]; then
+            echo "❌ Depends build verification failed: only $LIB_COUNT libraries found, expected more"
+            echo "Contents of $DEPENDS_PREFIX/lib:"
+            ls -la "$DEPENDS_PREFIX/lib/" || true
             exit 1
           fi
           

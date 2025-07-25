@@ -26,7 +26,32 @@ function(add_boost_if_needed)
     cmake_policy(SET CMP0167 OLD)
   endif()
   set(Boost_NO_BOOST_CMAKE ON)
-  find_package(Boost 1.73.0 REQUIRED system)
+
+  # For depends builds, ensure we look for static libraries
+  if(DEFINED ENV{BOOST_ROOT} OR DEFINED BOOST_ROOT)
+    set(Boost_USE_STATIC_LIBS ON)
+    set(Boost_USE_MULTITHREADED ON)
+    set(Boost_USE_STATIC_RUNTIME OFF)
+    # Set additional paths that depends might use
+    if(DEFINED BOOST_ROOT)
+      set(BOOST_LIBRARYDIR "${BOOST_ROOT}/lib")
+      set(BOOST_INCLUDEDIR "${BOOST_ROOT}/include")
+
+      # Check if BOOST_ROOT actually contains Boost libraries
+      file(GLOB BOOST_HEADERS "${BOOST_ROOT}/include/boost/config.hpp")
+      if(NOT BOOST_HEADERS)
+        message(STATUS "⚠️ BOOST_ROOT set but no Boost headers found, unsetting BOOST_ROOT")
+        unset(BOOST_ROOT)
+        unset(BOOST_LIBRARYDIR)
+        unset(BOOST_INCLUDEDIR)
+      endif()
+    endif()
+  endif()
+
+  # Since we only use Boost headers, find Boost without requiring specific components
+  message(STATUS "Finding Boost headers (header-only usage)...")
+  find_package(Boost 1.73.0 REQUIRED)
+  
   mark_as_advanced(Boost_INCLUDE_DIR)
   set_target_properties(Boost::headers PROPERTIES IMPORTED_GLOBAL TRUE)
   target_compile_definitions(Boost::headers INTERFACE
