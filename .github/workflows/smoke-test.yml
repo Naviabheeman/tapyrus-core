@@ -54,7 +54,6 @@ jobs:
     runs-on: ${{ matrix.config.os }}
     env:
       BASE_ROOT_DIR: ${{ github.workspace }}
-      CCACHE_DIR: ${{ github.workspace }}/ccache
       BASE_BUILD_DIR: ${{ github.workspace }}/build
       CC: ${{ matrix.config.compiler }}
       CXX: ${{ matrix.config.compiler }}++
@@ -67,19 +66,11 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha }}
           submodules: recursive
 
-      - name: Restore Ccache cache
-        id: ccache-cache
-        uses: actions/cache/restore@v4
-        with:
-          path: ${{ env.CCACHE_DIR }}
-          key: smoke-${{ matrix.config.platform }}-${{ matrix.config.arch }}-ccache-${{ github.run_id }}
-          restore-keys: smoke-${{ matrix.config.platform }}-${{ matrix.config.arch }}-ccache-
-
       - name: Setup Linux Dependencies
         if: matrix.config.platform == 'linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y clang ccache build-essential cmake pkgconf python3-zmq libevent-dev bsdmainutils libboost-filesystem-dev libboost-test-dev libdb5.3++-dev libminiupnpc-dev libzmq3-dev libqrencode-dev systemtap-sdt-dev bpfcc-tools bpftrace python3-venv
+          sudo apt-get install -y clang build-essential cmake pkgconf python3-zmq libevent-dev bsdmainutils libboost-filesystem-dev libboost-test-dev libdb5.3++-dev libminiupnpc-dev libzmq3-dev libqrencode-dev systemtap-sdt-dev bpfcc-tools bpftrace python3-venv
           python3 -m venv $HOME/venv
           source $HOME/venv/bin/activate
           pip3 install pyzmq
@@ -103,7 +94,7 @@ jobs:
             brew install --quiet berkeley-db
             echo "Installed berkeley-db (will use --with-incompatible-bdb)"
           fi
-          brew install --quiet coreutils ninja pkgconf gnu-getopt ccache boost libevent zeromq qrencode
+          brew install --quiet coreutils ninja pkgconf gnu-getopt boost libevent zeromq qrencode
           echo 'export PATH="/opt/homebrew/bin:$PATH"' >> $HOME/.bashrc
           echo 'export BOOST_ROOT="/opt/homebrew/opt/boost"' >> $HOME/.bashrc
           echo 'export BOOST_INCLUDEDIR="/opt/homebrew/opt/boost/include"' >> $HOME/.bashrc
@@ -210,13 +201,6 @@ jobs:
           fi
           
           echo "---------------- SMOKE TEST COMPLETE ---------------------"
-
-      - name: Save Ccache cache
-        uses: actions/cache/save@v4
-        if: steps.ccache-cache.outputs.cache-hit != 'true'
-        with:
-          path: ${{ env.CCACHE_DIR }}
-          key: smoke-${{ matrix.config.platform }}-${{ matrix.config.arch }}-ccache-${{ github.run_id }}
 
       - name: Upload test results
         if: always()

@@ -201,25 +201,14 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: ${{ env.CCACHE_DIR }}
-          key: daily-${{ matrix.config.platform }}-${{ matrix.config.arch }}-${{ matrix.config.build_type }}-${{ matrix.config.enable_gui }}-${{ matrix.config.enable_usdt }}-${{ matrix.config.enable_wallet }}-ccache-${{ github.run_id }}
-          restore-keys: daily-${{ matrix.config.platform }}-${{ matrix.config.arch }}-${{ matrix.config.build_type }}-${{ matrix.config.enable_gui }}-${{ matrix.config.enable_usdt }}-${{ matrix.config.enable_wallet }}-ccache-
+          key: daily-${{ matrix.config.platform }}-${{ matrix.config.arch }}-${{ matrix.config.build_type }}-${{ matrix.config.enable_gui }}-${{ matrix.config.enable_usdt }}-${{ matrix.config.enable_wallet }}-ccache
 
       - name: Restore Depends cache
         id: depends-cache
         uses: actions/cache/restore@v4
         with:
           path: ${{ env.DEPENDS_DIR }}
-          key: depends-v3-${{ matrix.config.platform }}-${{ matrix.config.arch }}-gui${{ matrix.config.enable_gui }}-wallet${{ matrix.config.enable_wallet }}-usdt${{ matrix.config.enable_usdt }}-${{ hashFiles('depends/packages/*') }}
-          restore-keys: depends-v3-${{ matrix.config.platform }}-${{ matrix.config.arch }}-gui${{ matrix.config.enable_gui }}-wallet${{ matrix.config.enable_wallet }}-usdt${{ matrix.config.enable_usdt }}-
-
-      - name: Restore Benchmark History cache
-        if: (matrix.config.platform == 'linux' && matrix.config.arch == 'x86_64') || (matrix.config.platform == 'macos' && matrix.config.arch == 'arm64')
-        id: benchmark-cache
-        uses: actions/cache/restore@v4
-        with:
-          path: ${{ github.workspace }}/benchmark_results/data
-          key: benchmark-history-${{ matrix.config.platform }}-${{ matrix.config.arch }}-${{ github.run_id }}
-          restore-keys: benchmark-history-${{ matrix.config.platform }}-${{ matrix.config.arch }}-
+          key: depends-full-${{ matrix.config.platform }}-${{ matrix.config.arch }}-${{ matrix.config.target_platform || 'native' }}-${{ matrix.config.target_arch || 'native' }}-${{ hashFiles('depends/packages/*', 'depends/Makefile', 'depends/**/*.mk') }}
 
       - name: Setup Linux Dependencies
         if: matrix.config.platform == 'linux'
@@ -347,82 +336,18 @@ jobs:
             clang --target=$HOST --version || echo "Warning: clang target test failed"
           fi
 
-          # Set depends options based on build configuration
+          # Always build depends with ALL features enabled for maximum reusability
+          # Individual jobs will configure CMake to use only what they need
           DEPENDS_OPTS="HOST=$HOST"
-          if [ "${{ matrix.config.enable_gui }}" == "false" ]; then
-            DEPENDS_OPTS="$DEPENDS_OPTS NO_QT=1"
-          fi
-          if [ "${{ matrix.config.enable_wallet }}" == "false" ]; then
-            DEPENDS_OPTS="$DEPENDS_OPTS NO_WALLET=1"
-          fi
-          if [ "${{ matrix.config.enable_usdt }}" == "false" ]; then
-            DEPENDS_OPTS="$DEPENDS_OPTS NO_USDT=1"
-          fi
 
-          # Check if depends is already built and valid
           DEPENDS_PREFIX="$DEPENDS_DIR/$HOST"
-          if [ -d "$DEPENDS_PREFIX" ] && [ -d "$DEPENDS_PREFIX/lib" ] && [ -d "$DEPENDS_PREFIX/include" ]; then
-            echo "Depends appears to be already built, verifying required dependencies..."
 
-            # Define required files based on configuration
-            REQUIRED_FILES=()
-            MISSING_FILES=()
-
-            # Base packages - always required
-            REQUIRED_FILES+=("$DEPENDS_PREFIX/lib/libevent.a")
-            REQUIRED_FILES+=("$DEPENDS_PREFIX/lib/libzmq.a")
-            REQUIRED_FILES+=("$DEPENDS_PREFIX/include/boost/config.hpp")
-            REQUIRED_FILES+=("$DEPENDS_PREFIX/include/zmq.h")
-
-            # GUI dependencies
-            if [ "${{ matrix.config.enable_gui }}" == "true" ]; then
-              if [ "${{ matrix.config.platform }}" == "linux" ]; then
-                REQUIRED_FILES+=("$DEPENDS_PREFIX/lib/libQt5Core.so")
-                REQUIRED_FILES+=("$DEPENDS_PREFIX/lib/libQt5Widgets.so")
-                REQUIRED_FILES+=("$DEPENDS_PREFIX/lib/libQt5Gui.so")
-              else
-                REQUIRED_FILES+=("$DEPENDS_PREFIX/lib/libQt5Core.framework")
-                REQUIRED_FILES+=("$DEPENDS_PREFIX/lib/libQt5Widgets.framework")
-                REQUIRED_FILES+=("$DEPENDS_PREFIX/lib/libQt5Gui.framework")
-              fi
-            fi
-
-            # Wallet dependencies (Berkeley DB)
-            if [ "${{ matrix.config.enable_wallet }}" == "true" ]; then
-              REQUIRED_FILES+=("$DEPENDS_PREFIX/lib/libdb_cxx-4.8.a")
-              REQUIRED_FILES+=("$DEPENDS_PREFIX/lib/libdb-4.8.a")
-              REQUIRED_FILES+=("$DEPENDS_PREFIX/include/db_cxx.h")
-              REQUIRED_FILES+=("$DEPENDS_PREFIX/include/db.h")
-            fi
-
-            # USDT dependencies (Linux only)
-            if [ "${{ matrix.config.enable_usdt }}" == "true" ] && [ "${{ matrix.config.platform }}" == "linux" ]; then
-              REQUIRED_FILES+=("$DEPENDS_PREFIX/include/sys/sdt.h")
-            fi
-
-            # Check all required files
-            echo "Checking for ${#REQUIRED_FILES[@]} required dependency files..."
-            echo "DEPENDS_PREFIX: $DEPENDS_PREFIX"
-            echo "Configuration: GUI=${{ matrix.config.enable_gui }} WALLET=${{ matrix.config.enable_wallet }} USDT=${{ matrix.config.enable_usdt }}"
-            echo "Platform: ${{ matrix.config.platform }}"
-
-            for file in "${REQUIRED_FILES[@]}"; do
-              if [ ! -f "$file" ]; then
-                MISSING_FILES+=("$file")
-                echo "Missing: $file"
-              fi
-            done
-
-            if [ ${#MISSING_FILES[@]} -eq 0 ]; then
-              echo "Depends verification passed - all ${#REQUIRED_FILES[@]} required files found"
-            else
-              echo "Depends verification failed - ${#MISSING_FILES[@]} files missing"
-              rm -rf "$DEPENDS_PREFIX"
-            fi
-          fi
-
-          if  [ ! -d "$DEPENDS_PREFIX" ]; then
-            echo "----------------   Building Depends $HOST     ----------------"
+          # Simple check: if depends directory exists with basic structure, assume it's valid
+          if [ -d "$DEPENDS_PREFIX" ] && [ -d "$DEPENDS_PREFIX/lib" ] && [ -f "$DEPENDS_PREFIX/toolchain.cmake" ]; then
+            echo "Depends cache found and appears valid"
+            echo "Using cached depends at: $DEPENDS_PREFIX"
+          else
+            echo "----------------   Building Full Depends with ALL features for $HOST     ----------------"
             if ! make -C depends $DEPENDS_OPTS -j$CPU_COUNT install_cmake; then
               echo "Depends build failed"
               exit 1
@@ -453,16 +378,10 @@ jobs:
 
       - name: Save Depends cache
         uses: actions/cache/save@v4
+        if: steps.depends-cache.outputs.cache-hit != 'true'
         with:
           path: ${{ env.DEPENDS_DIR }}
-          key: depends-v3-${{ matrix.config.platform }}-${{ matrix.config.arch }}-gui${{ matrix.config.enable_gui }}-wallet${{ matrix.config.enable_wallet }}-usdt${{ matrix.config.enable_usdt }}-${{ hashFiles('depends/packages/*') }}
-
-      - name: Save Benchmark History cache
-        if: always() && ((matrix.config.platform == 'linux' && matrix.config.arch == 'x86_64') || (matrix.config.platform == 'macos' && matrix.config.arch == 'arm64'))
-        uses: actions/cache/save@v4
-        with:
-          path: ${{ github.workspace }}/benchmark_results/data
-          key: benchmark-history-${{ matrix.config.platform }}-${{ matrix.config.arch }}-${{ github.run_id }}
+          key: depends-full-${{ matrix.config.platform }}-${{ matrix.config.arch }}-${{ matrix.config.target_platform || 'native' }}-${{ matrix.config.target_arch || 'native' }}-${{ hashFiles('depends/packages/*', 'depends/Makefile', 'depends/**/*.mk') }}
 
       - name: Enable core dumps
         run: |
@@ -772,10 +691,10 @@ jobs:
 
       - name: Save Ccache cache
         uses: actions/cache/save@v4
-        if: steps.ccache-cache.outputs.cache-hit != 'true'
+        if: always()
         with:
           path: ${{ env.CCACHE_DIR }}
-          key: daily-${{ matrix.config.platform }}-${{ matrix.config.arch }}-${{ matrix.config.build_type }}-${{ matrix.config.enable_gui }}-${{ matrix.config.enable_usdt }}-${{ matrix.config.enable_wallet }}-ccache-${{ github.run_id }}
+          key: daily-${{ matrix.config.platform }}-${{ matrix.config.arch }}-${{ matrix.config.build_type }}-${{ matrix.config.enable_gui }}-${{ matrix.config.enable_usdt }}-${{ matrix.config.enable_wallet }}-ccache
 
       - name: Upload test results
         if: always()
