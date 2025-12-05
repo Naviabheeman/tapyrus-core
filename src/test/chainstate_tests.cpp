@@ -44,14 +44,14 @@ BOOST_AUTO_TEST_CASE(blockindex_work_comparator_edge_cases)
     CBlockIndex indexA, indexB;
 
     // Case 1: Same height, different sequence IDs
-    // Block with lower sequence ID should come first
+    // Block with HIGHER sequence ID should come first (more recent blocks prioritized)
     indexA.nHeight = 100;
     indexA.nSequenceId = 5;
     indexB.nHeight = 100;
     indexB.nSequenceId = 10;
 
-    BOOST_CHECK(comparator(&indexA, &indexB) == true);  // A < B (lower seq ID)
-    BOOST_CHECK(comparator(&indexB, &indexA) == false); // B > A
+    BOOST_CHECK(comparator(&indexA, &indexB) == false); // A > B (lower seq ID, so A comes after B)
+    BOOST_CHECK(comparator(&indexB, &indexA) == true);  // B < A (higher seq ID, so B comes before A)
 
     // Case 2: Same height, same sequence ID (pointer tie-breaker)
     // This happens with blocks loaded from disk (both have id = 0)
@@ -86,8 +86,8 @@ BOOST_AUTO_TEST_CASE(blockindex_work_comparator_edge_cases)
     indexB.nHeight = 100;
     indexB.nSequenceId = std::numeric_limits<int32_t>::max() - 1;
 
-    BOOST_CHECK(comparator(&indexA, &indexB) == false); // Higher seq ID comes after
-    BOOST_CHECK(comparator(&indexB, &indexA) == true);
+    BOOST_CHECK(comparator(&indexA, &indexB) == true);  // Higher seq ID (max) comes first
+    BOOST_CHECK(comparator(&indexB, &indexA) == false); // Lower seq ID comes after
 
     // Case 6: Minimum sequence ID edge case (used in PreciousBlock)
     indexA.nHeight = 100;
@@ -95,8 +95,8 @@ BOOST_AUTO_TEST_CASE(blockindex_work_comparator_edge_cases)
     indexB.nHeight = 100;
     indexB.nSequenceId = std::numeric_limits<int32_t>::min() + 1;
 
-    BOOST_CHECK(comparator(&indexA, &indexB) == true);  // Lower (min) seq ID comes first
-    BOOST_CHECK(comparator(&indexB, &indexA) == false);
+    BOOST_CHECK(comparator(&indexA, &indexB) == false); // Lower (min) seq ID comes after
+    BOOST_CHECK(comparator(&indexB, &indexA) == true);  // Higher seq ID comes first
 }
 
 /**
@@ -178,9 +178,6 @@ BOOST_AUTO_TEST_CASE(disconnect_result_edge_cases)
  */
 BOOST_AUTO_TEST_CASE(block_sequence_id_edge_cases)
 {
-    // Access the global chainstate
-    CChainState& chainstate = g_chainstate;
-
     // Note: We cannot directly access private members, but we can test
     // the observable behavior through the public API
 
@@ -255,8 +252,6 @@ BOOST_AUTO_TEST_CASE(chainstate_initialization_edge_cases)
  */
 BOOST_AUTO_TEST_CASE(invalid_block_tracking_edge_cases)
 {
-    CChainState& chainstate = g_chainstate;
-
     // Create test block indices
     CBlockIndex invalidBlock1;
     invalidBlock1.nHeight = 10;
@@ -373,13 +368,13 @@ BOOST_AUTO_TEST_CASE(block_index_candidates_edge_cases)
 
     BOOST_CHECK(testSet.size() == 3);
 
-    // Verify ordering (lower sequence ID comes first)
+    // Verify ordering (higher sequence ID comes first - more recent blocks prioritized)
     auto it = testSet.begin();
-    BOOST_CHECK(*it == &block1); // seq 1
+    BOOST_CHECK(*it == &block3); // seq 3 (highest, comes first)
     ++it;
     BOOST_CHECK(*it == &block2); // seq 2
     ++it;
-    BOOST_CHECK(*it == &block3); // seq 3
+    BOOST_CHECK(*it == &block1); // seq 1 (lowest, comes last)
 }
 
 /**
@@ -526,11 +521,12 @@ BOOST_AUTO_TEST_CASE(validation_state_edge_cases)
 
     // Case 4: Corruption possible
     CValidationState state4;
-    state4.Invalid(false, REJECT_INVALID, "test corruption", "", true); // corruption possible
+    state4.Invalid(false, REJECT_INVALID, "test corruption", ""); 
+    state4.SetCorruptionPossible();
     BOOST_CHECK(state4.CorruptionPossible());
 
     CValidationState state5;
-    state5.Invalid(false, REJECT_INVALID, "test no corruption", "", false); // no corruption
+    state5.Invalid(false, REJECT_INVALID, "test no corruption", "");
     BOOST_CHECK(!state5.CorruptionPossible());
 }
 
@@ -538,24 +534,25 @@ BOOST_AUTO_TEST_CASE(validation_state_edge_cases)
  * Test scriptcheckqueue edge cases
  *
  * Tests CCheckQueue<CScriptCheck> edge cases:
- * - Queue initialization
+ * - Queue initialization with worker threads
  * - Empty queue handling
+ * - Worker thread lifecycle (automatic start/stop)
  */
 BOOST_AUTO_TEST_CASE(scriptcheckqueue_edge_cases)
 {
-    // Create a script check queue
-    CCheckQueue<CScriptCheck> queue(128); // 128 threads max
+    // Case 1: Verify queue is created and ready to use
+    // Create a script check queue with batch_size=128 and 1 worker thread
+    // Constructor automatically starts worker threads
+    // If construction succeeds without throwing, the queue is valid
+    CCheckQueue<CScriptCheck> queue(128, 1);
+    // Queue construction succeeded - this is our verification for Case 1
 
-    // Case 1: Verify queue is created
-    // The queue should be ready to use
+    // Case 2: Test with empty queue
+    // Wait() should return true even with no checks added
+    BOOST_CHECK(queue.Wait());
 
-    // Case 2: Control lifecycle
-    queue.StartWorkerThreads(1); // Start with 1 worker
-
-    // Case 3: Stop workers
-    queue.StopWorkerThreads();
-
-    // Queue should still be valid after stopping workers
+    // Case 3: Destructor will automatically stop and join worker threads
+    // when queue goes out of scope
 }
 
 /**

@@ -58,6 +58,7 @@ add_executable(test_tapyrus
         bswap_tests.cpp
         chainparams_tests.cpp
         federationparams_tests.cpp
+        chainstate_tests.cpp
         checkdatasig_tests.cpp
         checkqueue_tests.cpp
         coins_tests.cpp
