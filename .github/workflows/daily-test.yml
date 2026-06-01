@@ -190,7 +190,7 @@ jobs:
       DEPENDS_DIR: ${{ github.workspace }}/depends
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           # Use manual input if provided, otherwise use current branch (for PRs) or master (for scheduled runs)
           ref: ${{ github.event.inputs.test_branch || github.ref || 'master' }}
@@ -198,14 +198,14 @@ jobs:
 
       - name: Restore Ccache cache
         id: ccache-cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: ${{ env.CCACHE_DIR }}
           key: daily-${{ matrix.config.platform }}-${{ matrix.config.arch }}-${{ matrix.config.build_type }}-${{ matrix.config.enable_gui }}-${{ matrix.config.enable_usdt }}-${{ matrix.config.enable_wallet }}-ccache
 
       - name: Restore Depends cache
         id: depends-cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v5
         with:
           path: ${{ env.DEPENDS_DIR }}
           key: depends-full-${{ matrix.config.platform }}-${{ matrix.config.arch }}-${{ matrix.config.target_platform || 'native' }}-${{ matrix.config.target_arch || 'native' }}-${{ hashFiles('depends/packages/*', 'depends/Makefile', 'depends/**/*.mk') }}
@@ -377,7 +377,7 @@ jobs:
           echo "---------------- ----------------- --------------- ---------------- "
 
       - name: Save Depends cache
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v5
         if: steps.depends-cache.outputs.cache-hit != 'true'
         with:
           path: ${{ env.DEPENDS_DIR }}
@@ -690,7 +690,7 @@ jobs:
           echo "---------------- DAILY TEST FINISHED ---------------------"
 
       - name: Save Ccache cache
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v5
         if: always()
         with:
           path: ${{ env.CCACHE_DIR }}
@@ -698,7 +698,7 @@ jobs:
 
       - name: Upload test results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: daily-test-results-${{ matrix.config.name }}-${{ github.run_id }}
           path: |
@@ -709,7 +709,7 @@ jobs:
 
       - name: Upload coverage data
         if: matrix.config.build_type == 'Debug'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: coverage-data-${{ matrix.config.name }}-${{ github.run_id }}
           path: |
@@ -754,7 +754,7 @@ jobs:
 
       - name: Upload Core Dumps
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: daily-core-dumps-${{ matrix.config.name }}-${{ github.run_id }}
           path: ${{ github.workspace }}/core_dumps/
