@@ -13,6 +13,23 @@ Updated RPCs
   covers only the UTXO set, so it stays comparable with older versions. To
   check that two nodes have the same chainstate, compare both fields.
 
+Deprecated RPCs
+---------------
+
+The following are deprecated and will be removed in the next release:
+
+- `validateaddress` wallet fields. `ismine`, `iswatchonly`, `script`, `hex`,
+  `pubkeys`, `sigsrequired`, `pubkey`, `addresses`, `embedded`,
+  `iscompressed`, `account`, `timestamp`, `hdkeypath` and `kdmasterkeyid` are
+  returned only with `-deprecatedrpc=validateaddress`. Use `getaddressinfo`
+  instead.
+- `signrawtransaction`. It works only with
+  `-deprecatedrpc=signrawtransaction`. Use `signrawtransactionwithkey` or
+  `signrawtransactionwithwallet` instead.
+- `getinfo`. This hidden command only returns an error naming the RPCs that
+  replace it: `getblockchaininfo`, `getnetworkinfo` and `getwalletinfo`.
+  `tapyrus-cli -getinfo` shows the same information in one view.
+
 P2P
 ---
 
