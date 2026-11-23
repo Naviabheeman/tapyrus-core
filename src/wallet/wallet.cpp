@@ -1681,7 +1681,7 @@ int64_t CWallet::RescanFromTime(int64_t startTime, const WalletRescanReserver& r
     CBlockIndex* startBlock = nullptr;
     {
         LOCK(cs_main);
-        startBlock = g_chainstate_manager.ActiveChain().FindEarliestAtLeast(startTime - TIMESTAMP_WINDOW);
+        startBlock = g_chainstate_manager.ActiveChain().FindEarliestAtLeast(startTime - TIMESTAMP_WINDOW, 0);
         WalletLogPrintf("%s: Rescanning last %i blocks\n", __func__, startBlock ? g_chainstate_manager.ActiveChain().Height() - startBlock->nHeight + 1 : 0);
     }
 
