@@ -107,7 +107,7 @@ WalletTxStatus MakeWalletTxStatus(const CWalletTx& wtx) EXCLUSIVE_LOCKS_REQUIRED
 {
     BlockIndexMap& blockIndex = g_chainstate_manager.BlockIndex();
     WalletTxStatus result;
-    auto mi = blockIndex.mapBlockIndex.find(wtx.hashBlock);
+    auto mi = blockIndex.mapBlockIndex.find(wtx.m_confirm.hashBlock);
     CBlockIndex* block = mi != blockIndex.mapBlockIndex.end() ? mi->second : nullptr;
     result.block_height = (block ? block->nHeight : std::numeric_limits<int>::max());
     result.depth_in_main_chain = wtx.GetDepthInMainChain();
