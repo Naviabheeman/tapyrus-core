@@ -21,6 +21,7 @@
 #include <txmempool.h>
 #include <utilmemory.h>
 #include <validation.h>
+#include <validationinterface.h>
 #include <xfieldhistory.h>
 
 namespace interfaces {
@@ -159,6 +160,21 @@ public:
         return true;
     }
 
+    bool findNextBlock(const uint256& block_hash, int block_height, const FoundBlock& next, bool* reorg) override
+    {
+        const CBlockIndex* index;
+        {
+            LOCK(cs_main);
+            const CBlockIndex* block = ActiveChain()[block_height];
+            if (block && block->GetBlockHash() != block_hash) block = nullptr;
+            if (reorg) *reorg = !block;
+            index = block ? ActiveChain()[block_height + 1] : nullptr;
+            if (!FillIndexData(index, next)) return false;
+        }
+        FillBlockData(index, next);
+        return true;
+    }
+
     bool findFirstBlockWithTimeAndHeight(int64_t min_time, int min_height, const FoundBlock& block) override
     {
         const CBlockIndex* index;
@@ -219,6 +235,26 @@ public:
         return found;
     }
 
+    bool hasBlocks(const uint256& block_hash, int min_height, std::optional<int> max_height) override
+    {
+        // hasBlocks returns true if all ancestors of block_hash in specified
+        // range have block data (are not pruned), false if any ancestors in
+        // specified range are missing data.
+        //
+        // For simplicity and robustness, min_height and max_height are only
+        // used to limit the range, and passing min_height that's too low or
+        // max_height that's too high will not crash or change the result.
+        LOCK(cs_main);
+        if (const CBlockIndex* block = g_chainstate_manager.BlockIndex().LookupBlockIndex(block_hash)) {
+            if (max_height && block->nHeight >= *max_height) block = block->GetAncestor(*max_height);
+            for (; block->nStatus & BLOCK_HAVE_DATA; block = block->pprev) {
+                // Check pprev to not segfault if min_height is too low
+                if (block->nHeight <= min_height || !block->pprev) return true;
+            }
+        }
+        return false;
+    }
+
     double guessVerificationProgress(const uint256& block_hash) override
     {
         LOCK(cs_main);
@@ -234,6 +270,15 @@ public:
     bool isInitialBlockDownload() override
     {
         return IsInitialBlockDownload();
+    }
+
+    void waitForNotificationsIfTipChanged(const uint256& old_tip) override
+    {
+        if (!old_tip.IsNull()) {
+            LOCK(cs_main);
+            if (const CBlockIndex* tip = ActiveChain().Tip(); tip && old_tip == tip->GetBlockHash()) return;
+        }
+        SyncWithValidationInterfaceQueue();
     }
 
     uint32_t getMaxBlockSize() override

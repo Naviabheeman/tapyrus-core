@@ -242,7 +242,32 @@ BOOST_AUTO_TEST_CASE(the_progress_size_and_key_come_from_the_chain)
     BOOST_CHECK(m_chain->getAggregatePubkey().IsFullyValid());
 }
 
+BOOST_AUTO_TEST_CASE(the_next_block_and_block_data_follow_the_active_chain)
+{
+    const CBlockIndex* tip = Tip();
+    const CBlockIndex* prev = tip->pprev;
+    uint256 next;
+    bool reorg{true};
+    BOOST_CHECK(m_chain->findNextBlock(prev->GetBlockHash(), prev->nHeight, interfaces::FoundBlock().hash(next), &reorg));
+    BOOST_CHECK(!reorg);
+    BOOST_CHECK_EQUAL(next, tip->GetBlockHash());
+    BOOST_CHECK(m_chain->hasBlocks(tip->GetBlockHash(), 0, tip->nHeight));
+    // Returns at once when the tip is the one given.
+    m_chain->waitForNotificationsIfTipChanged(tip->GetBlockHash());
+}
+
 // Negative cases: what the lookups must report as not found.
+
+BOOST_AUTO_TEST_CASE(the_tip_has_no_next_block_and_an_off_chain_block_reports_a_reorg)
+{
+    const CBlockIndex* tip = Tip();
+    bool reorg{true};
+    BOOST_CHECK(!m_chain->findNextBlock(tip->GetBlockHash(), tip->nHeight, {}, &reorg));
+    BOOST_CHECK(!reorg);
+    BOOST_CHECK(!m_chain->findNextBlock(uint256S("01"), tip->nHeight - 1, {}, &reorg));
+    BOOST_CHECK(reorg);
+    BOOST_CHECK(!m_chain->hasBlocks(uint256S("01")));
+}
 
 BOOST_AUTO_TEST_CASE(an_unknown_block_is_not_found_and_leaves_the_outputs)
 {

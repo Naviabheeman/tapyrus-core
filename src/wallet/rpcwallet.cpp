@@ -3468,58 +3468,53 @@ UniValue rescanblockchain(const JSONRPCRequest& request)
         throw JSONRPCError(RPC_WALLET_ERROR, "Wallet is currently rescanning. Abort existing rescan or wait.");
     }
 
-    CBlockIndex *pindexStart = nullptr;
-    CBlockIndex *pindexStop = nullptr;
-    CBlockIndex *pChainTip = nullptr;
+    int start_height = 0;
+    std::optional<int> stop_height;
+    uint256 start_block;
     {
-        LOCK(cs_main);
-        pindexStart = g_chainstate_manager.ActiveChain().Genesis();
-        pChainTip = g_chainstate_manager.ActiveChain().Tip();
+        LOCK2(cs_main, pwallet->cs_wallet);
+        int tip_height = pwallet->GetLastBlockHeight();
 
         if (!request.params[0].isNull()) {
-            pindexStart = g_chainstate_manager.ActiveChain()[request.params[0].get_int()];
-            if (!pindexStart) {
+            start_height = request.params[0].get_int();
+            if (start_height < 0 || start_height > tip_height) {
                 throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid start_height");
             }
         }
 
         if (!request.params[1].isNull()) {
-            pindexStop = g_chainstate_manager.ActiveChain()[request.params[1].get_int()];
-            if (!pindexStop) {
+            stop_height = request.params[1].get_int();
+            if (*stop_height < 0 || *stop_height > tip_height) {
                 throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid stop_height");
-            }
-            else if (pindexStop->nHeight < pindexStart->nHeight) {
+            } else if (*stop_height < start_height) {
                 throw JSONRPCError(RPC_INVALID_PARAMETER, "stop_height must be greater than start_height");
             }
         }
-    }
 
-    // We can't rescan beyond non-pruned blocks, stop and throw an error
-    if (g_chainstate_manager.GetBlockFileManager().GetOptions().fPruneMode) {
-        LOCK(cs_main);
-        CBlockIndex *block = pindexStop ? pindexStop : pChainTip;
-        while (block && block->nHeight >= pindexStart->nHeight) {
-            if (!(block->nStatus & BLOCK_HAVE_DATA)) {
-                throw JSONRPCError(RPC_MISC_ERROR, "Can't rescan beyond pruned data. Use RPC call getblockchaininfo to determine your pruned height.");
-            }
-            block = block->pprev;
+        // We can't rescan beyond non-pruned blocks, stop and throw an error
+        if (!pwallet->chain().hasBlocks(pwallet->GetLastBlockHash(), start_height, stop_height)) {
+            throw JSONRPCError(RPC_MISC_ERROR, "Can't rescan beyond pruned data. Use RPC call getblockchaininfo to determine your pruned height.");
+        }
+
+        if (!pwallet->chain().findAncestorByHeight(pwallet->GetLastBlockHash(), start_height, interfaces::FoundBlock().hash(start_block))) {
+            throw JSONRPCError(RPC_INTERNAL_ERROR, "Start block is not an ancestor of the wallet's last processed block");
         }
     }
 
-    CBlockIndex *stopBlock = pwallet->ScanForWalletTransactions(pindexStart, pindexStop, reserver, true);
-    if (!stopBlock) {
-        if (pwallet->IsAbortingRescan()) {
-            throw JSONRPCError(RPC_MISC_ERROR, "Rescan aborted.");
-        }
-        // if we got a nullptr returned, ScanForWalletTransactions did rescan up to the requested stopindex
-        stopBlock = pindexStop ? pindexStop : pChainTip;
-    }
-    else {
+    CWallet::ScanResult result =
+        pwallet->ScanForWalletTransactions(start_block, start_height, stop_height, reserver, true /* fUpdate */);
+    switch (result.status) {
+    case CWallet::ScanResult::SUCCESS:
+        break;
+    case CWallet::ScanResult::FAILURE:
         throw JSONRPCError(RPC_MISC_ERROR, "Rescan failed. Potentially corrupted data files.");
+    case CWallet::ScanResult::USER_ABORT:
+        throw JSONRPCError(RPC_MISC_ERROR, "Rescan aborted.");
+        // no default case, so the compiler can warn about missing cases
     }
     UniValue response(UniValue::VOBJ);
-    response.pushKV("start_height", pindexStart->nHeight);
-    response.pushKV("stop_height", stopBlock->nHeight);
+    response.pushKV("start_height", start_height);
+    response.pushKV("stop_height", result.last_scanned_height ? *result.last_scanned_height : UniValue());
     return response;
 }
 

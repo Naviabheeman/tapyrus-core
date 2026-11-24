@@ -58,8 +58,8 @@ UniValue CallGenerate(const JSONRPCRequest& request)
 
 BOOST_FIXTURE_TEST_CASE(rescan, TestChainSetup)
 {
+    std::unique_ptr<interfaces::Chain> chain = interfaces::MakeChain(m_node);
     // Cap last block file size, and mine new block in a new block file.
-    CBlockIndex* const nullBlock = nullptr;
     CBlockIndex* oldTip = g_chainstate_manager.ActiveChain().Tip();
     {
         BlockFileManager& blockFileManager = g_chainstate_manager.GetBlockFileManager();
@@ -74,7 +74,7 @@ BOOST_FIXTURE_TEST_CASE(rescan, TestChainSetup)
     // Verify ScanForWalletTransactions picks up transactions in both the old
     // and new block files.
     {
-        CWallet wallet(nullptr, "dummy", WalletDatabase::CreateDummy());
+        CWallet wallet(chain.get(), "dummy", WalletDatabase::CreateDummy());
         {
             LOCK(wallet.cs_wallet);
             wallet.SetLastBlockProcessed(g_chainstate_manager.ActiveChain().Height(), g_chainstate_manager.ActiveChain().Tip()->GetBlockHash());
@@ -82,7 +82,11 @@ BOOST_FIXTURE_TEST_CASE(rescan, TestChainSetup)
         AddKey(wallet, coinbaseKey);
         WalletRescanReserver reserver(&wallet);
         reserver.reserve();
-        BOOST_CHECK_EQUAL(nullBlock, wallet.ScanForWalletTransactions(oldTip, nullptr, reserver));
+        CWallet::ScanResult result = wallet.ScanForWalletTransactions(oldTip->GetBlockHash(), oldTip->nHeight, {} /* max_height */, reserver);
+        BOOST_CHECK_EQUAL(result.status, CWallet::ScanResult::SUCCESS);
+        BOOST_CHECK(result.last_failed_block.IsNull());
+        BOOST_CHECK_EQUAL(result.last_scanned_block, newTip->GetBlockHash());
+        BOOST_CHECK_EQUAL(*result.last_scanned_height, newTip->nHeight);
         BOOST_CHECK_EQUAL(wallet.GetBalance()[ColorIdentifier()], 100 * ConsensusConstants::COIN);
     }
 
@@ -93,7 +97,7 @@ BOOST_FIXTURE_TEST_CASE(rescan, TestChainSetup)
     // Verify ScanForWalletTransactions only picks transactions in the new block
     // file.
     {
-        CWallet wallet(nullptr, "dummy", WalletDatabase::CreateDummy());
+        CWallet wallet(chain.get(), "dummy", WalletDatabase::CreateDummy());
         {
             LOCK(wallet.cs_wallet);
             wallet.SetLastBlockProcessed(g_chainstate_manager.ActiveChain().Height(), g_chainstate_manager.ActiveChain().Tip()->GetBlockHash());
@@ -101,7 +105,11 @@ BOOST_FIXTURE_TEST_CASE(rescan, TestChainSetup)
         AddKey(wallet, coinbaseKey);
         WalletRescanReserver reserver(&wallet);
         reserver.reserve();
-        BOOST_CHECK_EQUAL(oldTip, wallet.ScanForWalletTransactions(oldTip, nullptr, reserver));
+        CWallet::ScanResult result = wallet.ScanForWalletTransactions(oldTip->GetBlockHash(), oldTip->nHeight, {} /* max_height */, reserver);
+        BOOST_CHECK_EQUAL(result.status, CWallet::ScanResult::FAILURE);
+        BOOST_CHECK_EQUAL(result.last_failed_block, oldTip->GetBlockHash());
+        BOOST_CHECK_EQUAL(result.last_scanned_block, newTip->GetBlockHash());
+        BOOST_CHECK_EQUAL(*result.last_scanned_height, newTip->nHeight);
         BOOST_CHECK_EQUAL(wallet.GetBalance()[ColorIdentifier()], 50 * ConsensusConstants::COIN);
     }
 
@@ -109,7 +117,7 @@ BOOST_FIXTURE_TEST_CASE(rescan, TestChainSetup)
     // before the missing block, and success for a key whose creation time is
     // after.
     {
-        std::shared_ptr<CWallet> wallet = std::make_shared<CWallet>(nullptr, "dummy", WalletDatabase::CreateDummy());
+        std::shared_ptr<CWallet> wallet = std::make_shared<CWallet>(chain.get(), "dummy", WalletDatabase::CreateDummy());
         {
             LOCK(wallet->cs_wallet);
             wallet->SetLastBlockProcessed(g_chainstate_manager.ActiveChain().Height(), g_chainstate_manager.ActiveChain().Tip()->GetBlockHash());
@@ -155,6 +163,7 @@ BOOST_FIXTURE_TEST_CASE(rescan, TestChainSetup)
 // than or equal to key birthday.
 BOOST_FIXTURE_TEST_CASE(importwallet_rescan, TestChainSetup)
 {
+    std::unique_ptr<interfaces::Chain> chain = interfaces::MakeChain(m_node);
     // Create two blocks with same timestamp to verify that importwallet rescan
     // will pick up both blocks, not just the first.
     const int64_t BLOCK_TIME = g_chainstate_manager.ActiveChain().Tip()->GetBlockTimeMax() + 5;
@@ -174,7 +183,7 @@ BOOST_FIXTURE_TEST_CASE(importwallet_rescan, TestChainSetup)
 
     // Import key into wallet and call dumpwallet to create backup file.
     {
-        std::shared_ptr<CWallet> wallet = std::make_shared<CWallet>(nullptr, "dummy", WalletDatabase::CreateDummy());
+        std::shared_ptr<CWallet> wallet = std::make_shared<CWallet>(chain.get(), "dummy", WalletDatabase::CreateDummy());
         {
             LOCK(wallet->cs_wallet);
             wallet->SetLastBlockProcessed(g_chainstate_manager.ActiveChain().Height(), g_chainstate_manager.ActiveChain().Tip()->GetBlockHash());
@@ -194,7 +203,7 @@ BOOST_FIXTURE_TEST_CASE(importwallet_rescan, TestChainSetup)
     // Call importwallet RPC and verify all blocks with timestamps >= BLOCK_TIME
     // were scanned, and no prior blocks were scanned.
     {
-        std::shared_ptr<CWallet> wallet = std::make_shared<CWallet>(nullptr, "dummy", WalletDatabase::CreateDummy());
+        std::shared_ptr<CWallet> wallet = std::make_shared<CWallet>(chain.get(), "dummy", WalletDatabase::CreateDummy());
         {
             LOCK(wallet->cs_wallet);
             wallet->SetLastBlockProcessed(g_chainstate_manager.ActiveChain().Height(), g_chainstate_manager.ActiveChain().Tip()->GetBlockHash());
@@ -312,7 +321,7 @@ public:
         AddKey(*wallet, coinbaseKey);
         WalletRescanReserver reserver(wallet.get());
         reserver.reserve();
-        wallet->ScanForWalletTransactions(g_chainstate_manager.ActiveChain().Genesis(), nullptr, reserver);
+        wallet->ScanForWalletTransactions(g_chainstate_manager.ActiveChain().Genesis()->GetBlockHash(), 0, {}, reserver);
     }
 
     ~ListCoinsTestingSetup()
@@ -561,7 +570,7 @@ public:
         AddKey(*wallet, key2);
         WalletRescanReserver reserver(wallet.get());
         reserver.reserve();
-        wallet->ScanForWalletTransactions(g_chainstate_manager.ActiveChain().Genesis(), nullptr, reserver);
+        wallet->ScanForWalletTransactions(g_chainstate_manager.ActiveChain().Genesis()->GetBlockHash(), 0, {}, reserver);
     }
 
     ~BalanceTestingSetup()
@@ -584,7 +593,7 @@ public:
 
         WalletRescanReserver reserver(wallet.get());
         reserver.reserve();
-        if(!wallet->ScanForWalletTransactions(g_chainstate_manager.ActiveChain().Genesis(), nullptr, reserver, true)) {
+        if (wallet->ScanForWalletTransactions(g_chainstate_manager.ActiveChain().Genesis()->GetBlockHash(), 0, {}, reserver, true).status != CWallet::ScanResult::SUCCESS) {
             return false;
         }
 
@@ -826,11 +835,12 @@ BOOST_FIXTURE_TEST_CASE(wallet_token_balance, BalanceTestingSetup)
 
 BOOST_FIXTURE_TEST_CASE(wallet_tx_getdebit_and_getcredit, TestChainSetup)
 {
+    std::unique_ptr<interfaces::Chain> chain = interfaces::MakeChain(m_node);
     initKeys();
     LOCK(cs_main);
 
     // Prepare a dummy wallet that has all the coinbase transaction coins from genesis.
-    CWallet wallet(nullptr, "dummy", WalletDatabase::CreateDummy());
+    CWallet wallet(chain.get(), "dummy", WalletDatabase::CreateDummy());
     {
         LOCK(wallet.cs_wallet);
         wallet.SetLastBlockProcessed(g_chainstate_manager.ActiveChain().Height(), g_chainstate_manager.ActiveChain().Tip()->GetBlockHash());
@@ -840,7 +850,7 @@ BOOST_FIXTURE_TEST_CASE(wallet_tx_getdebit_and_getcredit, TestChainSetup)
     AddKey(wallet, key0);
     WalletRescanReserver reserver(&wallet);
     reserver.reserve();
-    wallet.ScanForWalletTransactions(g_chainstate_manager.ActiveChain().Genesis(), nullptr, reserver);
+    wallet.ScanForWalletTransactions(g_chainstate_manager.ActiveChain().Genesis()->GetBlockHash(), 0, {}, reserver);
 
     ColorIdentifier defaultColorId;
     ColorIdentifier colorId(ColorIdentifier(m_coinbase_txns[0]->vout[0].scriptPubKey));
@@ -894,11 +904,12 @@ BOOST_FIXTURE_TEST_CASE(wallet_tx_getdebit_and_getcredit, TestChainSetup)
 
 BOOST_FIXTURE_TEST_CASE(wallet_tx_getdebit_and_getcredit_with_watch_only, TestChainSetup)
 {
+    std::unique_ptr<interfaces::Chain> chain = interfaces::MakeChain(m_node);
     initKeys();
     LOCK(cs_main);
 
     // Prepare a dummy wallet that has all the coinbase transaction coins from genesis.
-    CWallet wallet(nullptr, "dummy", WalletDatabase::CreateDummy());
+    CWallet wallet(chain.get(), "dummy", WalletDatabase::CreateDummy());
     {
         LOCK(wallet.cs_wallet);
         wallet.SetLastBlockProcessed(g_chainstate_manager.ActiveChain().Height(), g_chainstate_manager.ActiveChain().Tip()->GetBlockHash());
@@ -907,7 +918,7 @@ BOOST_FIXTURE_TEST_CASE(wallet_tx_getdebit_and_getcredit_with_watch_only, TestCh
     AddKey(wallet, coinbaseKey);
     WalletRescanReserver reserver(&wallet);
     reserver.reserve();
-    wallet.ScanForWalletTransactions(g_chainstate_manager.ActiveChain().Genesis(), nullptr, reserver);
+    wallet.ScanForWalletTransactions(g_chainstate_manager.ActiveChain().Genesis()->GetBlockHash(), 0, {}, reserver);
 
     ColorIdentifier defaultColorId;
     ColorIdentifier colorId(ColorIdentifier(m_coinbase_txns[0]->vout[0].scriptPubKey));
@@ -979,11 +990,12 @@ BOOST_FIXTURE_TEST_CASE(wallet_tx_getdebit_and_getcredit_with_watch_only, TestCh
 
 BOOST_FIXTURE_TEST_CASE(wallet_tx_getchange, TestChainSetup)
 {
+    std::unique_ptr<interfaces::Chain> chain = interfaces::MakeChain(m_node);
     initKeys();
     LOCK(cs_main);
 
     // Prepare a dummy wallet that has all the coinbase transaction coins from genesis.
-    CWallet wallet(nullptr, "dummy", WalletDatabase::CreateDummy());
+    CWallet wallet(chain.get(), "dummy", WalletDatabase::CreateDummy());
     {
         LOCK(wallet.cs_wallet);
         wallet.SetLastBlockProcessed(g_chainstate_manager.ActiveChain().Height(), g_chainstate_manager.ActiveChain().Tip()->GetBlockHash());
@@ -993,7 +1005,7 @@ BOOST_FIXTURE_TEST_CASE(wallet_tx_getchange, TestChainSetup)
     AddKey(wallet, key0);
     WalletRescanReserver reserver(&wallet);
     reserver.reserve();
-    wallet.ScanForWalletTransactions(g_chainstate_manager.ActiveChain().Genesis(), nullptr, reserver);
+    wallet.ScanForWalletTransactions(g_chainstate_manager.ActiveChain().Genesis()->GetBlockHash(), 0, {}, reserver);
 
     ColorIdentifier defaultColorId;
     ColorIdentifier colorId(ColorIdentifier(m_coinbase_txns[0]->vout[0].scriptPubKey));
@@ -1041,7 +1053,7 @@ BOOST_FIXTURE_TEST_CASE(a_rescanning_wallet_reports_its_transactions, TestChainS
         LOCK(cs_main);
         WalletRescanReserver reserver(&wallet);
         reserver.reserve();
-        wallet.ScanForWalletTransactions(g_chainstate_manager.ActiveChain().Genesis(), nullptr, reserver);
+        wallet.ScanForWalletTransactions(g_chainstate_manager.ActiveChain().Genesis()->GetBlockHash(), 0, {}, reserver);
     }
     m_node.notifications.Unsubscribe(reports);
     BOOST_CHECK_EQUAL(reports.m_changed.size(), m_coinbase_txns.size());
@@ -1057,14 +1069,10 @@ BOOST_FIXTURE_TEST_CASE(a_wallet_without_a_node_reports_nothing, TestChainSetup)
         wallet.SetLastBlockProcessed(g_chainstate_manager.ActiveChain().Height(), g_chainstate_manager.ActiveChain().Tip()->GetBlockHash());
     }
     AddKey(wallet, coinbaseKey);
-    {
-        LOCK(cs_main);
-        WalletRescanReserver reserver(&wallet);
-        reserver.reserve();
-        wallet.ScanForWalletTransactions(g_chainstate_manager.ActiveChain().Genesis(), nullptr, reserver);
-    }
+    // Without a node the wallet cannot scan the chain; it takes the transaction directly.
+    BOOST_CHECK(wallet.AddToWallet(CWalletTx(&wallet, m_coinbase_txns[0])));
     m_node.notifications.Unsubscribe(reports);
-    BOOST_CHECK(wallet.GetBalance()[ColorIdentifier()] > 0);
+    BOOST_CHECK_EQUAL(wallet.mapWallet.count(m_coinbase_txns[0]->GetHashMalFix()), 1U);
     BOOST_CHECK(reports.m_changed.empty());
 }
 

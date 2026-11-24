@@ -91,6 +91,11 @@ public:
     //! or contents.
     virtual bool findBlock(const uint256& hash, const FoundBlock& block = {}) = 0;
 
+    //! Find the block after block_hash at block_height on the active chain and
+    //! optionally return its information. reorg is set when block_hash is no
+    //! longer on the active chain at that height.
+    virtual bool findNextBlock(const uint256& block_hash, int block_height, const FoundBlock& next = {}, bool* reorg = nullptr) = 0;
+
     //! Find first block in the chain with timestamp >= the given time
     //! and height >= than the given height, return false if there is no block
     //! with a high enough timestamp and height. Optionally return block
@@ -115,6 +120,11 @@ public:
         const FoundBlock& block1_out = {},
         const FoundBlock& block2_out = {}) = 0;
 
+    //! Return true if data is available for all blocks in the specified range
+    //! of blocks. This checks all blocks that are ancestors of block_hash in
+    //! the height range from min_height to max_height, inclusive.
+    virtual bool hasBlocks(const uint256& block_hash, int min_height = 0, std::optional<int> max_height = {}) = 0;
+
     //! Estimate fraction of total transactions verified if blocks up to
     //! the specified block hash are verified.
     virtual double guessVerificationProgress(const uint256& block_hash) = 0;
@@ -124,6 +134,10 @@ public:
 
     //! Check if in IBD.
     virtual bool isInitialBlockDownload() = 0;
+
+    //! Wait for pending notifications to be processed unless block hash points to the current
+    //! chain tip.
+    virtual void waitForNotificationsIfTipChanged(const uint256& old_tip) = 0;
 
     //! The block size limit the latest xfield sets.
     virtual uint32_t getMaxBlockSize() = 0;
