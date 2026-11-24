@@ -5,11 +5,11 @@
 
 #include <chain.h>
 #include <blockfilemanager.h>
-#include <chainstatemanager.h>
 #include <blockindex.h>
 #include <clientversion.h>
 #include <key_io.h>
 #include <rpc/protocol.h>
+#include <interfaces/chain.h>
 #include <rpc/server.h>
 #include <rpc/jsonrpcrequest.h>
 #include <validation.h>
@@ -186,7 +186,7 @@ UniValue importprivkey(const JSONRPCRequest& request)
         if (!request.params[2].isNull())
             fRescan = request.params[2].get_bool();
 
-        if (fRescan && g_chainstate_manager.GetBlockFileManager().GetOptions().fPruneMode)
+        if (fRescan && pwallet->chain().isPruneMode())
             throw JSONRPCError(RPC_WALLET_ERROR, "Rescan is disabled in pruned mode");
 
         if (fRescan && !reserver.reserve()) {
@@ -330,7 +330,7 @@ UniValue importaddress(const JSONRPCRequest& request)
     if (!request.params[2].isNull())
         fRescan = request.params[2].get_bool();
 
-    if (fRescan && g_chainstate_manager.GetBlockFileManager().GetOptions().fPruneMode)
+    if (fRescan && pwallet->chain().isPruneMode())
         throw JSONRPCError(RPC_WALLET_ERROR, "Rescan is disabled in pruned mode");
 
     WalletRescanReserver reserver(pwallet);
@@ -370,7 +370,6 @@ UniValue importaddress(const JSONRPCRequest& request)
 
 UniValue importprunedfunds(const JSONRPCRequest& request)
 {
-    BlockIndexMap& blockIndex = g_chainstate_manager.BlockIndex();
     std::shared_ptr<CWallet> const wallet = GetWalletForJSONRPCRequest(request);
     CWallet* const pwallet = wallet.get();
     if (!EnsureWalletIsAvailable(pwallet, request.fHelp)) {
@@ -403,12 +402,10 @@ UniValue importprunedfunds(const JSONRPCRequest& request)
     int height = 0;
     if (merkleBlock.txn.ExtractMatches(vMatch, vIndex) == merkleBlock.header.hashImMerkleRoot) {
 
-        LOCK(cs_main);
-        const CBlockIndex* pindex = blockIndex.LookupBlockIndex(merkleBlock.header.GetHash());
-        if (!pindex || !g_chainstate_manager.ActiveChain().Contains(pindex)) {
+        bool in_active_chain{false};
+        if (!pwallet->chain().findBlock(merkleBlock.header.GetHash(), interfaces::FoundBlock().height(height).inActiveChain(in_active_chain)) || !in_active_chain) {
             throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Block not found in chain");
         }
-        height = pindex->nHeight;
 
         std::vector<uint256>::const_iterator it;
         if ((it = std::find(vMatch.begin(), vMatch.end(), hashTx))==vMatch.end()) {
@@ -510,7 +507,7 @@ UniValue importpubkey(const JSONRPCRequest& request)
     if (!request.params[2].isNull())
         fRescan = request.params[2].get_bool();
 
-    if (fRescan && g_chainstate_manager.GetBlockFileManager().GetOptions().fPruneMode)
+    if (fRescan && pwallet->chain().isPruneMode())
         throw JSONRPCError(RPC_WALLET_ERROR, "Rescan is disabled in pruned mode");
 
     WalletRescanReserver reserver(pwallet);
@@ -566,7 +563,7 @@ UniValue importwallet(const JSONRPCRequest& request)
             + HelpExampleRpc("importwallet", "\"test\"")
         );
 
-    if (g_chainstate_manager.GetBlockFileManager().GetOptions().fPruneMode)
+    if (pwallet->chain().isPruneMode())
         throw JSONRPCError(RPC_WALLET_ERROR, "Importing wallets is disabled in pruned mode");
 
     WalletRescanReserver reserver(pwallet);
@@ -586,7 +583,9 @@ UniValue importwallet(const JSONRPCRequest& request)
         if (!file.is_open()) {
             throw JSONRPCError(RPC_INVALID_PARAMETER, "Cannot open wallet dump file");
         }
-        nTimeBegin = g_chainstate_manager.ActiveChain().Tip()->GetBlockTime();
+        if (!pwallet->chain().findBlock(pwallet->GetLastBlockHash(), interfaces::FoundBlock().time(nTimeBegin))) {
+            throw JSONRPCError(RPC_INTERNAL_ERROR, "The wallet's last block is not in the block index");
+        }
 
         int64_t nFilesize = std::max((int64_t)1, (int64_t)file.tellg());
         file.seekg(0, file.beg);
@@ -799,8 +798,12 @@ UniValue dumpwallet(const JSONRPCRequest& request)
     // produce output
     file << strprintf("# Wallet dump created by Tapyrus %s\n", FormatFullVersion());
     file << strprintf("# * Created on %s\n", FormatISO8601DateTime(GetTime()));
-    file << strprintf("# * Best block at time of backup was %i (%s),\n", g_chainstate_manager.ActiveChain().Height(), g_chainstate_manager.ActiveChain().Tip()->GetBlockHash().ToString());
-    file << strprintf("#   mined on %s\n", FormatISO8601DateTime(g_chainstate_manager.ActiveChain().Tip()->GetBlockTime()));
+    file << strprintf("# * Best block at time of backup was %i (%s),\n", pwallet->GetLastBlockHeight(), pwallet->GetLastBlockHash().ToString());
+    int64_t block_time = 0;
+    if (!pwallet->chain().findBlock(pwallet->GetLastBlockHash(), interfaces::FoundBlock().time(block_time))) {
+        throw JSONRPCError(RPC_INTERNAL_ERROR, "The wallet's last block is not in the block index");
+    }
+    file << strprintf("#   mined on %s\n", FormatISO8601DateTime(block_time));
     file << "\n";
 
     // add the base58check encoded extended master if the wallet uses HD
@@ -1262,15 +1265,18 @@ UniValue importmulti(const JSONRPCRequest& mainRequest)
         EnsureWalletIsUnlocked(pwallet);
 
         // Verify all timestamps are present before importing any keys.
-        now = g_chainstate_manager.ActiveChain().Tip() ? g_chainstate_manager.ActiveChain().Tip()->GetMedianTimePast() : 0;
+        int64_t tip_time = 0;
+        if (!pwallet->chain().findBlock(pwallet->GetLastBlockHash(), interfaces::FoundBlock().time(tip_time).mtpTime(now))) {
+            now = 0;
+        }
         for (const UniValue& data : requests.getValues()) {
             GetImportTimestamp(data, now);
         }
 
         const int64_t minimumTimestamp = 1;
 
-        if (fRescan && g_chainstate_manager.ActiveChain().Tip()) {
-            nLowestTimestamp = g_chainstate_manager.ActiveChain().Tip()->GetBlockTime();
+        if (fRescan && now) {
+            nLowestTimestamp = tip_time;
         } else {
             fRescan = false;
         }

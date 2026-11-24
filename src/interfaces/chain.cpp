@@ -267,6 +267,11 @@ public:
         return g_chainstate_manager.HavePruned();
     }
 
+    bool isPruneMode() override
+    {
+        return g_chainstate_manager.GetBlockFileManager().GetOptions().fPruneMode;
+    }
+
     bool isInitialBlockDownload() override
     {
         return IsInitialBlockDownload();

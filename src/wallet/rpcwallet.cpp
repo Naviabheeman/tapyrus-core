@@ -6,7 +6,6 @@
 
 #include <amount.h>
 #include <blockindex.h>
-#include <chainstatemanager.h>
 #include <coloridentifier.h>
 #include <consensus/validation.h>
 #include <core_io.h>
@@ -114,17 +113,19 @@ void EnsureWalletIsUnlocked(CWallet * const pwallet)
 
 static void WalletTxToJSON(const CWallet* const pwallet, const CWalletTx& wtx, UniValue& entry)
 {
-    BlockIndexMap& blockIndex = g_chainstate_manager.BlockIndex();
     int confirms = wtx.GetDepthInMainChain();
     entry.pushKV("confirmations", confirms);
     if (wtx.IsCoinBase())
         entry.pushKV("generated", true);
     if (confirms > 0)
     {
-        AssertLockHeld(cs_main);
         entry.pushKV("blockhash", wtx.m_confirm.hashBlock.GetHex());
         entry.pushKV("blockindex", wtx.m_confirm.nIndex);
-        entry.pushKV("blocktime", blockIndex.LookupBlockIndex(wtx.m_confirm.hashBlock)->GetBlockTime());
+        int64_t block_time;
+        if (!pwallet->chain().findBlock(wtx.m_confirm.hashBlock, interfaces::FoundBlock().time(block_time))) {
+            throw JSONRPCError(RPC_INTERNAL_ERROR, "The transaction's block is not in the block index");
+        }
+        entry.pushKV("blocktime", block_time);
     } else {
         entry.pushKV("trusted", wtx.IsTrusted());
     }
@@ -694,7 +695,7 @@ static UniValue getreceivedbyaddress(const JSONRPCRequest& request)
     CAmount nAmount = 0;
     for (const std::pair<const uint256, CWalletTx>& pairWtx : pwallet->mapWallet) {
         const CWalletTx& wtx = pairWtx.second;
-        if (wtx.IsCoinBase() || !CheckFinalTx(*wtx.tx))
+        if (wtx.IsCoinBase() || !pwallet->chain().checkFinalTx(*wtx.tx))
             continue;
 
         for (const CTxOut& txout : wtx.tx->vout)
@@ -760,7 +761,7 @@ static UniValue getreceivedbylabel(const JSONRPCRequest& request)
     TxColoredCoinBalancesMap lable_balance;
     for (const std::pair<const uint256, CWalletTx>& pairWtx : pwallet->mapWallet) {
         const CWalletTx& wtx = pairWtx.second;
-        if (wtx.IsCoinBase() || !CheckFinalTx(*wtx.tx))
+        if (wtx.IsCoinBase() || !pwallet->chain().checkFinalTx(*wtx.tx))
             continue;
 
         for (const CTxOut& txout : wtx.tx->vout)
@@ -1121,7 +1122,7 @@ static UniValue ListReceived(CWallet * const pwallet, const UniValue& params, bo
     for (const std::pair<const uint256, CWalletTx>& pairWtx : pwallet->mapWallet) {
         const CWalletTx& wtx = pairWtx.second;
 
-        if (wtx.IsCoinBase() || !CheckFinalTx(*wtx.tx))
+        if (wtx.IsCoinBase() || !pwallet->chain().checkFinalTx(*wtx.tx))
             continue;
 
         int nDepth = wtx.GetDepthInMainChain();
@@ -1622,7 +1623,6 @@ UniValue listtransactions(const JSONRPCRequest& request)
 
 static UniValue listsinceblock(const JSONRPCRequest& request)
 {
-    BlockIndexMap& blockIndex = g_chainstate_manager.BlockIndex();
     std::shared_ptr<CWallet> const wallet = GetWalletForJSONRPCRequest(request);
     CWallet* const pwallet = wallet.get();
 
@@ -1684,24 +1684,20 @@ static UniValue listsinceblock(const JSONRPCRequest& request)
 
     LOCK2(cs_main, pwallet->cs_wallet);
 
-    const CBlockIndex* pindex = nullptr;    // Block index of the specified block or the common ancestor, if the block provided was in a deactivated chain.
-    const CBlockIndex* paltindex = nullptr; // Block index of the specified block, even if it's in a deactivated chain.
+    std::optional<int> height; // Height of the specified block or the common ancestor, if the block provided was in a deactivated chain.
+    std::optional<int> altheight; // Height of the specified block, even if it's in a deactivated chain.
     int target_confirms = 1;
     isminefilter filter = ISMINE_SPENDABLE;
 
+    uint256 blockId;
     if (!request.params[0].isNull() && !request.params[0].get_str().empty()) {
-        uint256 blockId;
-
         blockId.SetHex(request.params[0].get_str());
-        paltindex = pindex = blockIndex.LookupBlockIndex(blockId);
-        if (!pindex) {
+        height.emplace();
+        altheight.emplace();
+        // A block of a deactivated chain is read at its last common ancestor
+        // with the active chain, not at its own height.
+        if (!pwallet->chain().findCommonAncestor(blockId, pwallet->GetLastBlockHash(), /* ancestor out */ interfaces::FoundBlock().height(*height), /* blockId out */ interfaces::FoundBlock().height(*altheight))) {
             throw JSONRPCError(RPC_INVALID_ADDRESS_OR_KEY, "Block not found");
-        }
-        if (g_chainstate_manager.ActiveChain()[pindex->nHeight] != pindex) {
-            // the block being asked for is a part of a deactivated chain;
-            // we don't want to depend on its perceived height in the block
-            // chain, we want to instead use the last common ancestor
-            pindex = g_chainstate_manager.ActiveChain().FindFork(pindex);
         }
     }
 
@@ -1719,7 +1715,7 @@ static UniValue listsinceblock(const JSONRPCRequest& request)
 
     bool include_removed = (request.params[3].isNull() || request.params[3].get_bool());
 
-    int depth = pindex ? (1 + g_chainstate_manager.ActiveChain().Height() - pindex->nHeight) : -1;
+    int depth = height ? pwallet->GetLastBlockHeight() + 1 - *height : -1;
 
     UniValue transactions(UniValue::VARR);
 
@@ -1734,9 +1730,9 @@ static UniValue listsinceblock(const JSONRPCRequest& request)
     // when a reorg'd block is requested, we also list any relevant transactions
     // in the blocks of the chain that was detached
     UniValue removed(UniValue::VARR);
-    while (include_removed && paltindex && paltindex != pindex) {
+    while (include_removed && altheight && *altheight > *height) {
         CBlock block;
-        if (!g_chainstate_manager.ReadBlock(block, paltindex)) {
+        if (!pwallet->chain().findBlock(blockId, interfaces::FoundBlock().data(block)) || block.IsNull()) {
             throw JSONRPCError(RPC_INTERNAL_ERROR, "Can't read block from disk");
         }
         for (const CTransactionRef& tx : block.vtx) {
@@ -1747,11 +1743,13 @@ static UniValue listsinceblock(const JSONRPCRequest& request)
                 ListTransactions(pwallet, it->second, -100000000, true, removed, filter);
             }
         }
-        paltindex = paltindex->pprev;
+        blockId = block.hashPrevBlock;
+        --*altheight;
     }
 
-    CBlockIndex *pblockLast = g_chainstate_manager.ActiveChain()[g_chainstate_manager.ActiveChain().Height() + 1 - target_confirms];
-    uint256 lastblock = pblockLast ? pblockLast->GetBlockHash() : uint256();
+    // All zeros when target_confirms reaches below the genesis block.
+    uint256 lastblock;
+    pwallet->chain().findAncestorByHeight(pwallet->GetLastBlockHash(), pwallet->GetLastBlockHeight() + 1 - target_confirms, interfaces::FoundBlock().hash(lastblock));
 
     UniValue ret(UniValue::VOBJ);
     ret.pushKV("transactions", transactions);
@@ -3405,7 +3403,7 @@ UniValue generate(const JSONRPCRequest& request)
     int num_generate = request.params[0].get_int();
 
     // Skip IBD check in DEV mode
-    if (gArgs.GetChainMode() != TAPYRUS_OP_MODE::DEV && IsInitialBlockDownload()) {
+    if (gArgs.GetChainMode() != TAPYRUS_OP_MODE::DEV && pwallet->chain().isInitialBlockDownload()) {
         throw JSONRPCError(RPC_CLIENT_IN_INITIAL_DOWNLOAD, "Tapyrus is in initial sync and waiting for blocks...");
     }
 
@@ -3413,10 +3411,7 @@ UniValue generate(const JSONRPCRequest& request)
     if(!cPrivKey.IsValid())
         throw JSONRPCError(RPC_WALLET_INVALID_PRIVATE_KEY, "No private key given or invalid private key.");
 
-    XFieldAggPubKey aggpubkeyChange;
-    g_chainstate_manager.XFieldHistory().GetLatest(TAPYRUS_XFIELDTYPES::AGGPUBKEY, aggpubkeyChange);
-
-    if(cPrivKey.GetPubKey() != aggpubkeyChange.getPubKey())
+    if(cPrivKey.GetPubKey() != pwallet->chain().getAggregatePubkey())
         throw JSONRPCError(RPC_WALLET_INVALID_AGGREGATE_KEY, "Given private key doesn't correspond to the Aggregate Key.");
 
     std::shared_ptr<CReserveScript> coinbase_script;
@@ -3863,7 +3858,7 @@ UniValue sethdseed(const JSONRPCRequest& request)
             );
     }
 
-    if (IsInitialBlockDownload()) {
+    if (pwallet->chain().isInitialBlockDownload()) {
         throw JSONRPCError(RPC_CLIENT_IN_INITIAL_DOWNLOAD, "Cannot set a new HD seed while still in Initial Block Download");
     }
 

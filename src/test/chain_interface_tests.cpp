@@ -238,6 +238,7 @@ BOOST_AUTO_TEST_CASE(the_progress_size_and_key_come_from_the_chain)
     const double progress{m_chain->guessVerificationProgress(tip)};
     BOOST_CHECK(progress > 0.0 && progress <= 1.0);
     BOOST_CHECK(!m_chain->havePruned());
+    BOOST_CHECK(!m_chain->isPruneMode());
     BOOST_CHECK_EQUAL(m_chain->getMaxBlockSize(), g_chainstate_manager.XFieldHistory().GetCurrentMaxBlockSize());
     BOOST_CHECK(m_chain->getAggregatePubkey().IsFullyValid());
 }

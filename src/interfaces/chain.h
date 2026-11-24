@@ -132,6 +132,9 @@ public:
     //! Check if any block has been pruned.
     virtual bool havePruned() = 0;
 
+    //! Whether the node runs with -prune, whether or not it has pruned yet.
+    virtual bool isPruneMode() = 0;
+
     //! Check if in IBD.
     virtual bool isInitialBlockDownload() = 0;
 
