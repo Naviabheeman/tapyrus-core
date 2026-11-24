@@ -1241,6 +1241,11 @@ void CWallet::BlockUntilSyncedToCurrentChain() {
     AssertLockNotHeld(cs_main);
     AssertLockNotHeld(cs_wallet);
 
+    // A wallet that gets no events cannot catch up by waiting. This also keeps a
+    // release on the wallet thread from waiting on the node's queue.
+    WalletEvents* queue = m_event_queue;
+    if (!queue) return;
+
     {
         // Skip the queue-draining stuff if we know we're caught up with
         // the active tip...
@@ -1259,6 +1264,8 @@ void CWallet::BlockUntilSyncedToCurrentChain() {
     // for the queue to drain enough to execute it (indicating we are caught up
     // at least with the time we entered this function).
     SyncWithValidationInterfaceQueue();
+    // The node's queue has handed its events on to the wallet thread; wait for those too.
+    queue->Sync();
 }
 
 
@@ -4090,7 +4097,7 @@ bool CWallet::Verify(std::string wallet_file, bool salvage_wallet, std::string& 
     return WalletBatch::VerifyDatabaseFile(wallet_path, salvaged, error_string);
 }
 
-std::shared_ptr<CWallet> CWallet::CreateWalletFromFile(interfaces::Chain* chain, const std::string& name, const fs::path& path, uint64_t wallet_creation_flags)
+std::shared_ptr<CWallet> CWallet::CreateWalletFromFile(interfaces::Chain* chain, WalletEvents& events, const std::string& name, const fs::path& path, uint64_t wallet_creation_flags)
 {
     const std::string& walletFile = name;
     WalletNotifications* notifications = chain ? &chain->notifications() : nullptr;
@@ -4381,8 +4388,8 @@ std::shared_ptr<CWallet> CWallet::CreateWalletFromFile(interfaces::Chain* chain,
 
     uiInterface.LoadWallet(walletInstance);
 
-    // Register with the validation interface. It's ok to do this after rescan since we're still holding cs_main.
-    RegisterValidationInterface(walletInstance.get());
+    // Register with the wallet thread's queue. It's ok to do this after rescan since we're still holding cs_main.
+    events.Register(*walletInstance);
 
     walletInstance->SetBroadcastTransactions(gArgs.GetBoolArg("-walletbroadcast", DEFAULT_WALLETBROADCAST));
 
