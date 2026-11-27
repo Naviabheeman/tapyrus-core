@@ -20,7 +20,6 @@
 #include <rpc/jsonrpcrequest.h>
 #include <rpc/rpctable.h>
 #include <script/descriptor.h>
-#include <shutdown.h>
 #include <streams.h>
 #include <sync.h>
 #include <txdb.h>
@@ -459,7 +458,6 @@ static void CreateUTXOSnapshot(
         }
     };
     while (pcursor->Valid()) {
-        if (iter % 5000 == 0) ShutdownRequested();
         ++iter;
         if (pcursor->GetKey(key) && pcursor->GetValue(coin)) {
             if (key.hashMalFix != last_hash) {

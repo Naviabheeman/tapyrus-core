@@ -45,7 +45,9 @@ static int test_one_input_decodepstt_rpc(const uint8_t* data, size_t size)
 {
     const std::string base64_pstt(reinterpret_cast<const char*>(data), size);
 
-    NodeContext node;
+    ShutdownNotification shutdown;
+
+    NodeContext node(shutdown);
     JSONRPCRequest request(node);
     request.params = UniValue(UniValue::VARR);
     request.params.push_back(base64_pstt);

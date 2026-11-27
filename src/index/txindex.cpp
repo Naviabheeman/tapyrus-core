@@ -7,7 +7,7 @@
 #include <blockfilemanager.h>
 #include <chainstatemanager.h>
 #include <index/indexnotifications.h>
-#include <shutdown.h>
+#include <shutdownnotification.h>
 #include <util.h>
 #include <validation.h>
 
@@ -67,7 +67,7 @@ public:
 
     /// Migrate txindex data from the block tree DB, where it may be for older nodes that have not
     /// been upgraded yet to the new database.
-    bool MigrateData(CBlockTreeDB& block_tree_db, const CBlockLocator& best_locator, IndexNotifications& notifications);
+    bool MigrateData(CBlockTreeDB& block_tree_db, const CBlockLocator& best_locator, IndexNotifications& notifications, const ShutdownNotification& shutdown);
 };
 
 TxIndex::DB::DB(size_t n_cache_size, bool f_memory, bool f_wipe) :
@@ -106,7 +106,7 @@ static void WriteTxIndexMigrationBatches(CDBWrapper& newdb, CDBWrapper& olddb,
     batch_olddb.Clear();
 }
 
-bool TxIndex::DB::MigrateData(CBlockTreeDB& block_tree_db, const CBlockLocator& best_locator, IndexNotifications& notifications)
+bool TxIndex::DB::MigrateData(CBlockTreeDB& block_tree_db, const CBlockLocator& best_locator, IndexNotifications& notifications, const ShutdownNotification& shutdown)
 {
     // The prior implementation of txindex was always in sync with block index
     // and presence was indicated with a boolean DB flag. If the flag is set,
@@ -154,7 +154,7 @@ bool TxIndex::DB::MigrateData(CBlockTreeDB& block_tree_db, const CBlockLocator& 
     bool interrupted = false;
     std::unique_ptr<CDBIterator> cursor(block_tree_db.NewIterator());
     for (cursor->Seek(begin_key); cursor->Valid(); cursor->Next()) {
-        if (ShutdownRequested()) {
+        if (shutdown.IsRequested()) {
             interrupted = true;
             break;
         }
@@ -239,7 +239,7 @@ bool TxIndex::Init()
     // Attempt to migrate txindex from the old database to the new one. Even if
     // chain_tip is null, the node could be reindexing and we still want to
     // delete txindex records in the old database.
-    if (!m_db->MigrateData(blockIndex.DB(), m_chainman.ActiveChain().GetLocator(), m_notifications)) {
+    if (!m_db->MigrateData(blockIndex.DB(), m_chainman.ActiveChain().GetLocator(), m_notifications, m_chainman.Shutdown())) {
         return false;
     }
 

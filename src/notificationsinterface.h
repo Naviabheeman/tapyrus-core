@@ -44,6 +44,8 @@ public:
 
     /** A fatal error; detail is what the message names, such as a block hash. */
     virtual void ReportFatalError(FatalErrorReason reason, const std::string& detail) = 0;
+    /** Asks the node to shut down: RPC stop, the GUI, the wallet or init. */
+    virtual void ReportShutdownRequested() = 0;
 };
 
 #endif // TAPYRUS_NOTIFICATIONSINTERFACE_H

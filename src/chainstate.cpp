@@ -19,7 +19,7 @@
 #include <policy/policy.h>
 #include <policy/policyconstants.h>
 #include <precomputedcolordata.h>
-#include <shutdown.h>
+#include <shutdownnotification.h>
 #include <trace.h>
 #include <transactioncolorchecker.h>
 #include <txmempool.h>
@@ -1148,7 +1148,7 @@ bool Chainstate::ActivateBestChain(CValidationState &state, std::shared_ptr<cons
         }
         // When we reach this point, we switched to a new tip (stored in pindexNewTip).
 
-        if (nStopAtHeight && pindexNewTip && pindexNewTip->nHeight >= nStopAtHeight && !ShutdownRequested()) {
+        if (nStopAtHeight && pindexNewTip && pindexNewTip->nHeight >= nStopAtHeight && !m_chainman.Shutdown().IsRequested()) {
             m_chainman.Notifications().ReportStopHeightReached(nStopAtHeight);
         }
 
@@ -1156,7 +1156,7 @@ bool Chainstate::ActivateBestChain(CValidationState &state, std::shared_ptr<cons
         // never shutdown before connecting the genesis block during LoadChainTip(). Previously this
         // caused an assert() failure during shutdown in such cases as the UTXO DB flushing checks
         // that the best block hash is non-null.
-        if (ShutdownRequested())
+        if (m_chainman.Shutdown().IsRequested())
             break;
     } while (pindexNewTip != pindexMostWork);
     CheckBlockIndex();

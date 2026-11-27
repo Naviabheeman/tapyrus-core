@@ -8,6 +8,7 @@
 #define TAPYRUS_NOTIFICATIONHUB_H
 
 #include <notifications.h>
+#include <shutdownnotification.h>
 #include <sync.h>
 
 #include <chrono>
@@ -29,6 +30,7 @@ public:
 
     /** Records the fatal error as a warning and logs it. */
     void ReportFatalError(FatalErrorReason reason, const std::string& detail) override;
+    void ReportShutdownRequested() override;
     /** Sets the clock warning, telling the user how to fix their clock. */
     void ReportClockOutOfSync(std::chrono::minutes threshold) override;
     void ReportClockInSync() override;
@@ -90,13 +92,17 @@ public:
     void ReportFatalError(FatalErrorReason reason, const std::string& detail) override;
 };
 
-/** Shuts the node down on a fatal error and at the stop height. */
+/** Shuts the node down on a fatal error, at the stop height and when asked to. */
 class NodeShutdown : public Notifications
 {
 public:
-    static NodeShutdown& Instance();
+    explicit NodeShutdown(ShutdownNotification& shutdown) : m_shutdown(shutdown) {}
     void ReportFatalError(FatalErrorReason reason, const std::string& detail) override;
+    void ReportShutdownRequested() override;
     void ReportStopHeightReached(int height) override;
+
+private:
+    ShutdownNotification& m_shutdown;
 };
 
 #endif // TAPYRUS_NOTIFICATIONHUB_H

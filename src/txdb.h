@@ -27,6 +27,7 @@
 #include <vector>
 
 class CBlockIndex;
+class ShutdownNotification;
 class CCoinsViewDB;
 class CCoinsViewDBCursor;
 class uint256;
@@ -95,7 +96,8 @@ public:
     CCoinsViewCursor *Cursor() const override;
 
     //! Attempt to update from an older database format. Returns whether an error occurred.
-    bool Upgrade();
+    //! Stops early, leaving the rest for the next start, once shutdown is requested.
+    bool Upgrade(const ShutdownNotification& shutdown);
     size_t EstimateSize() const override;
 
 

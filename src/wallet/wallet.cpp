@@ -29,7 +29,6 @@
 #include <script/sign.h>
 #include <script/signaturecreator.h>
 #include <script/signaturedata.h>
-#include <shutdown.h>
 #include <utilmoneystr.h>
 #include <wallet/fees.h>
 #include <wallet/walletnotifications.h>
@@ -1751,7 +1750,7 @@ CWallet::ScanResult CWallet::ScanForWalletTransactions(const uint256& start_bloc
     double progress_end = chain().guessVerificationProgress(end_hash);
     double progress_current = progress_begin;
     int block_height = start_height;
-    while (!fAbortRescan && !ShutdownRequested()) {
+    while (!fAbortRescan && !chain().shutdownRequested()) {
         if (block_height % 100 == 0 && progress_end - progress_begin > 0.0) {
             ShowProgress(strprintf("%s " + _("Rescanning..."), GetDisplayName()), std::max(1, std::min(99, (int)((progress_current - progress_begin) / (progress_end - progress_begin) * 100))));
         }
@@ -1816,7 +1815,7 @@ CWallet::ScanResult CWallet::ScanForWalletTransactions(const uint256& start_bloc
     if (block_height && fAbortRescan) {
         WalletLogPrintf("Rescan aborted at block %d. Progress=%f\n", block_height, progress_current);
         result.status = ScanResult::USER_ABORT;
-    } else if (block_height && ShutdownRequested()) {
+    } else if (block_height && chain().shutdownRequested()) {
         WalletLogPrintf("Rescan interrupted by shutdown request at block %d. Progress=%f\n", block_height, progress_current);
         result.status = ScanResult::USER_ABORT;
     } else {

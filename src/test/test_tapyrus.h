@@ -63,7 +63,9 @@ std::ostream& operator<<(std::ostream& os, const uint256& num);
  */
 struct BasicTestingSetup {
     ECCVerifyHandle globalVerifyHandle;
-    NodeContext m_node;
+    //! The process's shutdown notification, for the node below.
+    ShutdownNotification m_shutdown;
+    NodeContext m_node{m_shutdown};
 
     explicit BasicTestingSetup(const std::string& chainName = TAPYRUS_MODES::PROD);
     ~BasicTestingSetup();

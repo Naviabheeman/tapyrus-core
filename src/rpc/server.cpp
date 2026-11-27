@@ -11,8 +11,8 @@
 
 #include <fs.h>
 #include <key_io.h>
+#include <nodecontext.h>
 #include <random.h>
-#include <shutdown.h>
 #include <sync.h>
 #include <ui_interface.h>
 #include <util.h>
@@ -252,7 +252,7 @@ UniValue stop(const JSONRPCRequest& jsonRequest)
             "\nStop Tapyrus server.");
     // Event loop will exit after current HTTP requests have been handled, so
     // this reply will get back to the client.
-    StartShutdown();
+    jsonRequest.context.notifications.ReportShutdownRequested();
     return "Tapyrus server stopping";
 }
 

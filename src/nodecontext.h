@@ -7,6 +7,7 @@
 #define TAPYRUS_NODECONTEXT_H
 
 #include <notificationhub.h>
+#include <shutdownnotification.h>
 
 #include <atomic>
 #include <memory>
@@ -21,10 +22,14 @@ class PeerManager;
 struct PolicySettings;
 
 /** The objects a running node owns, held in one place instead of globals.
- *  tapyrusd and tapyrus-qt create one and pass it to init, which fills it;
+ *  tapyrusd and tapyrus-qt create one, with their ShutdownNotification, and pass it to init, which fills it;
  *  RPC reaches it through the request context and the interfaces hold a
  *  reference. The pointer members are null until init creates them. */
 struct NodeContext {
+    //! Owned by tapyrusd's or tapyrus-qt's main, which outlives the node.
+    ShutdownNotification& shutdown;
+    //! Passes every shutdown request the hub receives on to shutdown.
+    NodeShutdown node_shutdown{shutdown};
     //! First, so the objects below that read it are destroyed before it.
     std::unique_ptr<const PolicySettings> policy;
     //! What the components publish to; keeps the warnings the GUI and RPC read.
@@ -50,7 +55,7 @@ struct NodeContext {
 
     //! Declared here and defined in the .cpp, so this header needs only
     //! forward declarations of the pointer members' types.
-    NodeContext();
+    explicit NodeContext(ShutdownNotification& shutdown_in);
     ~NodeContext();
 };
 

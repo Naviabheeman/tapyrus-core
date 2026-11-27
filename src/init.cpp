@@ -50,7 +50,7 @@
 #include <script/standard.h>
 #include <script/sigcache.h>
 #include <scheduler.h>
-#include <shutdown.h>
+#include <shutdownnotification.h>
 #include <txdb.h>
 #include <issuedcolorids.h>
 #include <txmempool.h>
@@ -60,6 +60,7 @@
 #include <utilmoneystr.h>
 #include <validationinterface.h>
 #include <walletinitinterface.h>
+#include <atomic>
 #include <stdexcept>
 #include <stdint.h>
 #include <stdio.h>
@@ -147,9 +148,9 @@ static const char* FEE_ESTIMATES_FILENAME="fee_estimates.dat";
 // The network-processing threads are all part of a thread group
 // created by AppInit() or the Qt main() function.
 //
-// A clean exit happens when StartShutdown() or the SIGTERM
-// signal handler sets ShutdownRequested(), which makes main thread's
-// WaitForShutdown() interrupts the thread group.
+// A clean exit happens when a shutdown request reaches the node's
+// ShutdownNotification, through the NotificationHub or the SIGTERM handler,
+// which wakes the main thread's WaitForShutdown() to interrupt the thread group.
 // And then, WaitForShutdown() makes all other on-going threads
 // in the thread group join the main thread.
 // Shutdown() is then called to clean up database connections, and stop other
@@ -157,7 +158,7 @@ static const char* FEE_ESTIMATES_FILENAME="fee_estimates.dat";
 // threads have exited.
 //
 // Shutdown for Qt is very similar, only it uses a QTimer to detect
-// ShutdownRequested() getting set, and then does the normal Qt
+// the request, and then does the normal Qt
 // shutdown thing.
 //
 
@@ -179,6 +180,10 @@ void Interrupt(NodeContext& node)
         g_txindex->Interrupt();
     }
 }
+
+//! The process's ShutdownNotification, for the signal handlers, which cannot be passed it.
+//! Set by AppInitBasicSetup and cleared by Shutdown, before the object goes away.
+static std::atomic<ShutdownNotification*> g_shutdown_for_signals{nullptr};
 
 void Shutdown(NodeContext& node)
 {
@@ -302,6 +307,7 @@ void Shutdown(NodeContext& node)
     globalVerifyHandle.reset();
     ECC_Stop();
     LogPrintf("%s: done\n", __func__);
+    g_shutdown_for_signals = nullptr;
 }
 
 /**
@@ -312,7 +318,7 @@ void Shutdown(NodeContext& node)
 #ifndef WIN32
 static void HandleSIGTERM(int)
 {
-    StartShutdown();
+    if (ShutdownNotification* shutdown = g_shutdown_for_signals.load()) shutdown->Request();
 }
 
 static void HandleSIGHUP(int)
@@ -322,7 +328,7 @@ static void HandleSIGHUP(int)
 #else
 static BOOL WINAPI consoleCtrlHandler(DWORD dwCtrlType)
 {
-    StartShutdown();
+    if (ShutdownNotification* shutdown = g_shutdown_for_signals.load()) shutdown->Request();
     Sleep(INFINITE);
     return true;
 }
@@ -690,7 +696,7 @@ static void ThreadImport(NodeContext& node, std::vector<fs::path> vImportFiles)
     CValidationState state;
     if (!chainman.ActiveChainstate().ActivateBestChain(state, nullptr)) {
         LogPrintf("Failed to connect best block (%s)\n", FormatStateMessage(state));
-        StartShutdown();
+        node.notifications.ReportShutdownRequested();
         return;
     }
 
@@ -710,14 +716,14 @@ static void ThreadImport(NodeContext& node, std::vector<fs::path> vImportFiles)
 
     if (gArgs.GetBoolArg("-stopafterblockimport", DEFAULT_STOPAFTERBLOCKIMPORT)) {
         LogPrintf("Stopping after block import\n");
-        StartShutdown();
+        node.notifications.ReportShutdownRequested();
         return;
     }
     } // End scope of CImportingNow
     if (g_policy_settings->persistMempool) {
         chainman.ActiveChainstate().LoadMempool();
     }
-    node.mempool_loaded = !ShutdownRequested();
+    node.mempool_loaded = !node.shutdown.IsRequested();
 }
 
 /** Sanity checks
@@ -886,8 +892,9 @@ ServiceFlags nLocalServices = ServiceFlags(NODE_NETWORK | NODE_NETWORK_LIMITED);
     std::terminate();
 };
 
-bool AppInitBasicSetup()
+bool AppInitBasicSetup(NodeContext& node)
 {
+    g_shutdown_for_signals = &node.shutdown;
     // ********************************************************* Step 1: setup
 #ifdef _MSC_VER
     // Turn off Microsoft heap dump noise
@@ -1048,11 +1055,11 @@ bool AppInitParameterInteraction(NodeContext& node)
     }
 
     node.cache = std::make_unique<const CacheSettings>(gArgs);
-    node.chainman = std::make_unique<ChainstateManager>();
+    node.chainman = std::make_unique<ChainstateManager>(node.shutdown);
     ChainstateManager& chainman = *node.chainman;
     chainman.InitOptions(ChainstateManager::Options(gArgs, chainparams.DefaultConsistencyChecks(), node.cache->nCoinCacheUsage));
     node.notifications.Subscribe(FatalErrorDialog::Instance());
-    node.notifications.Subscribe(NodeShutdown::Instance());
+    node.notifications.Subscribe(node.node_shutdown);
     chainman.SetNotifications(&node.notifications);
     const uint256& hashAssumeValid = chainman.GetOptions().hashAssumeValid;
     if (!hashAssumeValid.IsNull())
@@ -1381,7 +1388,7 @@ bool AppInitMain(NodeContext& node)
     LogPrintf("* Using %.1fMiB for in-memory UTXO set (plus up to %.1fMiB of unused mempool space)\n", cache.nCoinCacheUsage * (1.0 / 1024 / 1024), nMempoolSizeMax * (1.0 / 1024 / 1024));
 
     bool fLoaded = false;
-    while (!fLoaded && !ShutdownRequested()) {
+    while (!fLoaded && !node.shutdown.IsRequested()) {
         // Taken before LoadBlockIndex, which can switch reindexing on to resume an interrupted reindex.
         const bool wipeBlockTree = chainman.ShouldWipeBlockTree();
         std::string strLoadError;
@@ -1407,7 +1414,7 @@ bool AppInitMain(NodeContext& node)
                         blockFileManager.CleanupBlockRevFiles();
                 }
 
-                if (ShutdownRequested()) break;
+                if (node.shutdown.IsRequested()) break;
 
                 // LoadBlockIndex will load the pruned flag if we've ever removed a
                 // block file from disk.
@@ -1456,7 +1463,7 @@ bool AppInitMain(NodeContext& node)
 
                 // If necessary, upgrade from older database format.
                 // This is a no-op if we cleared the coinsviewdb with -reindex or -reindex-chainstate
-                if (!chainman.ActiveChainstate().CoinsDB().Upgrade()) {
+                if (!chainman.ActiveChainstate().CoinsDB().Upgrade(node.shutdown)) {
                     strLoadError = _("Error upgrading chainstate database");
                     break;
                 }
@@ -1547,7 +1554,7 @@ bool AppInitMain(NodeContext& node)
             LogPrintf(" block index %15dms\n", GetTimeMillis() - load_block_index_start_time);
         } while(false);
 
-        if (!fLoaded && !ShutdownRequested()) {
+        if (!fLoaded && !node.shutdown.IsRequested()) {
             // first suggest a reindex
             if (!wipeBlockTree) {
                 bool fRet = uiInterface.ThreadSafeQuestion(
@@ -1556,7 +1563,7 @@ bool AppInitMain(NodeContext& node)
                     "", CClientUIInterface::MSG_ERROR | CClientUIInterface::BTN_ABORT);
                 if (fRet) {
                     chainman.SetReindexing(true);
-                    AbortShutdown();
+                    node.shutdown.Reset();
                 } else {
                     LogPrintf("Aborted block database rebuild. Exiting.\n");
                     return false;
@@ -1570,7 +1577,7 @@ bool AppInitMain(NodeContext& node)
     // As LoadBlockIndex can take several minutes, it's possible the user
     // requested to kill the GUI during the last operation. If so, exit.
     // As the program has not fully started yet, Shutdown() is possibly overkill.
-    if (ShutdownRequested()) {
+    if (node.shutdown.IsRequested()) {
         LogPrintf("Shutdown requested. Exiting.\n");
         return false;
     }
@@ -1637,16 +1644,16 @@ bool AppInitMain(NodeContext& node)
     // Wait for genesis block to be processed
     {
         WaitableLock lock(cs_GenesisWait);
-        // We previously could hang here if StartShutdown() is called prior to
+        // We previously could hang here if a shutdown is requested prior to
         // ThreadImport getting started, so instead we just wait on a timer to
-        // check ShutdownRequested() regularly.
-        while (!fHaveGenesis && !ShutdownRequested()) {
+        // check for a shutdown request regularly.
+        while (!fHaveGenesis && !node.shutdown.IsRequested()) {
             condvar_GenesisWait.wait_for(lock, std::chrono::milliseconds(500));
         }
         uiInterface.NotifyBlockTip.disconnect(&BlockNotifyGenesisWait);
     }
 
-    if (ShutdownRequested()) {
+    if (node.shutdown.IsRequested()) {
         return false;
     }
 

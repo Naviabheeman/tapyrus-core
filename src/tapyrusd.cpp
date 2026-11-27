@@ -15,7 +15,7 @@
 #include <interfaces/chain.h>
 #include <nodecontext.h>
 #include <noui.h>
-#include <shutdown.h>
+#include <shutdownnotification.h>
 #include <util.h>
 #include <httpserver.h>
 #include <httprpc.h>
@@ -45,10 +45,7 @@
 
 static void WaitForShutdown(NodeContext& node)
 {
-    while (!ShutdownRequested())
-    {
-        MilliSleep(200);
-    }
+    node.shutdown.Wait();
     Interrupt(node);
 }
 
@@ -58,7 +55,8 @@ static void WaitForShutdown(NodeContext& node)
 //
 static bool AppInit(int argc, char* argv[])
 {
-    NodeContext node;
+    ShutdownNotification shutdown;
+    NodeContext node(shutdown);
     std::unique_ptr<interfaces::Chain> chain = interfaces::MakeChain(node);
     g_wallet_init_interface.SetChainInterface(chain.get());
 
@@ -127,7 +125,7 @@ static bool AppInit(int argc, char* argv[])
         // Set this early so that parameter interactions go to console
         InitLogging();
         InitParameterInteraction();
-        if (!AppInitBasicSetup())
+        if (!AppInitBasicSetup(node))
         {
             // InitError will have been called with detailed error, which ends up on console
             return false;

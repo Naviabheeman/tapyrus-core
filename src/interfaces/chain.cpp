@@ -44,6 +44,9 @@ public:
         return m_node.fee_estimator->HighestTargetTracked(FeeEstimateHorizon::LONG_HALFLIFE);
     }
 
+    void requestShutdown() override { m_node.notifications.ReportShutdownRequested(); }
+    bool shutdownRequested() override { return m_node.shutdown.IsRequested(); }
+
     CFeeRate estimateSmartFeeAtMaxBlocks(bool conservative) const override
     {
         return estimateSmartFee(estimateMaxBlocks(), conservative, nullptr);

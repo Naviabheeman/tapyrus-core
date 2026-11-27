@@ -36,6 +36,7 @@ class CChain;
 class CCoinsViewCache;
 class Chainstate;
 class ChainNotifications;
+class ShutdownNotification;
 class CTxMemPool;
 class CValidationState;
 
@@ -89,8 +90,11 @@ public:
 
     //! Declared here and defined in the .cpp, so this header needs only a
     //! forward declaration of Chainstate.
-    ChainstateManager();
+    explicit ChainstateManager(const ShutdownNotification& shutdown);
     ~ChainstateManager();
+
+    //! Long chain loops (block activation, mempool loading, block verification) stop when it is set.
+    const ShutdownNotification& Shutdown() const { return m_shutdown; }
 
     /** Sets the options once at start-up; tests set them again for each fixture. */
     void InitOptions(const Options& options);
@@ -248,6 +252,7 @@ private:
     //! Declared before the block file manager, which keeps a reference to it.
     BlockIndexMap m_block_index;
     ChainNotifications* m_notifications{nullptr};
+    const ShutdownNotification& m_shutdown;
     //! Built from the start-up options, so it cannot be a plain member.
     std::unique_ptr<BlockFileManager> m_block_file_manager;
     //! Read by the network thread while the import thread clears it.

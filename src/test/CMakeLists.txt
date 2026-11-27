@@ -172,9 +172,7 @@ add_executable(test_tapyrus
 #
 # Also carries noui.cpp (noui_connect(), which TestingSetup calls) and
 # genesisblock.cpp (createGenesisBlock(), used by the fixture and by
-# block_tests/federationparams_tests/miner_tests). test_tapyrus_main.cpp
-# and fuzz_node_globals.cpp provide test-friendly StartShutdown()/
-# ShutdownRequested(), so shutdown.cpp is never pulled from tapyrus_util.
+# block_tests/federationparams_tests/miner_tests).
 add_library(tapyrus_test_util OBJECT
     test_tapyrus.cpp
     test_keys_helper.cpp
@@ -249,23 +247,6 @@ target_link_libraries(test_tapyrus
 # and fuzz-script-sweep jobs turn this on.
 if(BUILD_FUZZ_TEST)
 
-# StartShutdown()/ShutdownRequested() for fuzz targets linking
-# FuzzNodeSetup (TestingSetup) -- test_tapyrus_main.cpp already provides
-# these for test_tapyrus, but that file also defines Boost Test's own
-# main(), which would collide with a fuzz binary's own libFuzzer/AFL
-# main() (pstt_fuzz_driver.h), so fuzz targets get their own copy from
-# fuzz_node_globals.cpp instead. Built once here rather than once per
-# fuzz target.
-add_library(tapyrus_fuzz_node_globals OBJECT
-    fuzz/fuzz_code/fuzz_node_globals.cpp
-)
-target_include_directories(tapyrus_fuzz_node_globals
-    PRIVATE
-        ${Boost_INCLUDE_DIRS}
-        $<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/../univalue/include>
-)
-target_link_libraries(tapyrus_fuzz_node_globals PRIVATE core_interface Boost::headers)
-
 function(add_pstt_fuzz_target name source)
     # Deliberately NOT EXCLUDE_FROM_ALL: BUILD_FUZZ_TEST already gates
     # whether this function's callers even run (see the if(BUILD_FUZZ_TEST)
@@ -311,7 +292,7 @@ endfunction()
 # symbol chain (via `nm -u`/`-why_load`, not guesswork) found it splits
 # cleanly in two:
 #
-# - Most of it (StartShutdown/uiInterface from tapyrus_util, OpenDiskFile/
+# - Most of it (uiInterface from tapyrus_util, OpenDiskFile/
 #   FlushStateToDisk/ReadBlockFromDisk/GetTransaction/AcceptToMemoryPool/etc.
 #   from tapyrus_chainstate, CMerkleBlock/CRollingBloomFilter/CConnman/
 #   NodeContext from tapyrus_peer) is satisfied by linking those for real below.
@@ -367,8 +348,7 @@ endfunction()
 # Harnesses that drive a real node through FuzzNodeSetup (fuzz_node_setup.h,
 # a TestingSetup subclass) -- e.g. RPC handlers that read chainstate or the
 # peer table. They link the same fixture object library test_tapyrus uses
-# (tapyrus_test_util, which carries noui.cpp and genesisblock.cpp) plus
-# tapyrus_fuzz_node_globals for StartShutdown/ShutdownRequested, so they
+# (tapyrus_test_util, which carries noui.cpp and genesisblock.cpp), so they
 # must not also compile rpc_glue_stub.cpp (duplicate symbols).
 function(add_fuzz_target_with_node_context name source)
     add_executable(${name}
@@ -394,7 +374,6 @@ function(add_fuzz_target_with_node_context name source)
             tapyrus_crypto
             Boost::headers
             tapyrus_test_util
-            tapyrus_fuzz_node_globals
             tapyrus_cli
             tapyrus_rpc
             tapyrus_peer

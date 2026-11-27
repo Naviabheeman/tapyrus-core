@@ -30,7 +30,6 @@
 #include <rpc/rpctimerinterface.h>
 #include <rpc/util.h>
 #include <script/signaturedata.h>
-#include <shutdown.h>
 #include <tapyrusmodes.h>
 #include <util.h>
 #include <utilmoneystr.h>
@@ -2203,7 +2202,7 @@ static UniValue encryptwallet(const JSONRPCRequest& request)
     // BDB seems to have a bad habit of writing old data into
     // slack space in .dat files; that is bad if the old data is
     // unencrypted private keys. So:
-    StartShutdown();
+    if (pwallet->HaveChain()) pwallet->chain().requestShutdown();
     return "wallet encrypted; Tapyrus server stopping, restart to run with encrypted wallet. The keypool has been flushed and a new HD seed was generated (if you are using HD). You need to make a new backup.";
 }
 

@@ -169,6 +169,11 @@ public:
     //! Fee rate to confirm within num_blocks, or CFeeRate(0) without enough data.
     virtual CFeeRate estimateSmartFee(int num_blocks, bool conservative, FeeCalculation* calc) const = 0;
 
+    //! Asks the node to shut down.
+    virtual void requestShutdown() = 0;
+    //! Whether the node has been asked to shut down.
+    virtual bool shutdownRequested() = 0;
+
     //! The highest confirmation target the fee estimator tracks.
     virtual unsigned int estimateMaxBlocks() const = 0;
 

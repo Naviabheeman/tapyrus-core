@@ -13,13 +13,3 @@
 {
   std::exit(EXIT_SUCCESS);
 }
-
-[[noreturn]] void StartShutdown()
-{
-  std::exit(EXIT_SUCCESS);
-}
-
-bool ShutdownRequested()
-{
-  return false;
-}

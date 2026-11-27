@@ -31,7 +31,6 @@
 #include <primitives/transaction.h>
 #include <script/script.h>
 #include <script/sigcache.h>
-#include <shutdown.h>
 #include <tinyformat.h>
 #include <transactioncolorchecker.h>
 //#include <timedata.h>

@@ -15,7 +15,7 @@
 #include <policy/policysettings.h>
 #include <txmempool.h>
 
-NodeContext::NodeContext() = default;
+NodeContext::NodeContext(ShutdownNotification& shutdown_in) : shutdown(shutdown_in) {}
 
 NodeContext::~NodeContext()
 {

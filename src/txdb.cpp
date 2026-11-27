@@ -10,7 +10,7 @@
 #include <chainparams.h>
 #include <hash.h>
 #include <random.h>
-#include <shutdown.h>
+#include <shutdownnotification.h>
 #include <uint256.h>
 #include <util.h>
 #include <ui_interface.h>
@@ -423,7 +423,7 @@ public:
  *
  * Currently implemented: from the per-tx utxo model (0.8..0.14.x) to per-txout.
  */
-bool CCoinsViewDB::Upgrade() {
+bool CCoinsViewDB::Upgrade(const ShutdownNotification& shutdown) {
     std::unique_ptr<CDBIterator> pcursor(db.NewIterator());
     pcursor->Seek(std::make_pair(DB_COINS, uint256()));
     if (!pcursor->Valid()) {
@@ -440,7 +440,7 @@ bool CCoinsViewDB::Upgrade() {
     std::pair<unsigned char, uint256> key;
     std::pair<unsigned char, uint256> prev_key = {DB_COINS, uint256()};
     while (pcursor->Valid()) {
-        if (ShutdownRequested()) {
+        if (shutdown.IsRequested()) {
             break;
         }
         if (pcursor->GetKey(key) && key.first == DB_COINS) {
@@ -482,7 +482,7 @@ bool CCoinsViewDB::Upgrade() {
     db.WriteBatch(batch);
     db.CompactRange({DB_COINS, uint256()}, key);
     uiInterface.ShowProgress("", 100, false);
-    LogPrintf("[%s].\n", ShutdownRequested() ? "CANCELLED" : "DONE");
-    return !ShutdownRequested();
+    LogPrintf("[%s].\n", shutdown.IsRequested() ? "CANCELLED" : "DONE");
+    return !shutdown.IsRequested();
 }
 

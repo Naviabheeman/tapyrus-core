@@ -8,7 +8,7 @@
 #include <chainstatemanager.h>
 #include <checkblock.h>
 #include <validation.h>
-#include <shutdown.h>
+#include <shutdownnotification.h>
 #include <ui_interface.h>
 #include <blockfilemanager.h>
 #include <issuedcolorids.h>
@@ -97,7 +97,7 @@ bool CVerifyDB::VerifyDB(Chainstate& chainstate, CCoinsView *coinsview, int nChe
                 nGoodTransactions += block.vtx.size();
             }
         }
-        if (ShutdownRequested()) {
+        if (chainstate.Chainman().Shutdown().IsRequested()) {
             LogPrintf("[ABORTED].\n");
             LogPrintf("VerifyDB(): interrupted by shutdown at height %d — level-%i verification incomplete\n",
                       pindex->nHeight, nCheckLevel);
@@ -113,7 +113,7 @@ bool CVerifyDB::VerifyDB(Chainstate& chainstate, CCoinsView *coinsview, int nChe
     // check level 4: try reconnecting blocks
     if (nCheckLevel >= 4) {
         while (pindex != chainstate.m_chain.Tip()) {
-            if (ShutdownRequested()) {
+            if (chainstate.Chainman().Shutdown().IsRequested()) {
                 LogPrintf("[ABORTED].\n");
                 LogPrintf("VerifyDB(): interrupted by shutdown at height %d — level-4 reconnect incomplete\n",
                           pindex->nHeight);

@@ -13,14 +13,22 @@
 
 #include <QAbstractNativeEventFilter>
 
+#include <functional>
+
 class WinShutdownMonitor : public QAbstractNativeEventFilter
 {
 public:
+    //! shutdown_fn asks the node to shut down when Windows ends the session.
+    explicit WinShutdownMonitor(std::function<void()> shutdown_fn) : m_shutdown_fn{std::move(shutdown_fn)} {}
+
     /** Implements QAbstractNativeEventFilter interface for processing Windows messages */
     bool nativeEventFilter(const QByteArray &eventType, void *pMessage, qintptr *pnResult) override;
 
     /** Register the reason for blocking shutdown on Windows to allow clean client exit */
     static void registerShutdownBlockReason(const QString& strReason, const HWND& mainWinId);
+
+private:
+    std::function<void()> m_shutdown_fn;
 };
 #endif
 

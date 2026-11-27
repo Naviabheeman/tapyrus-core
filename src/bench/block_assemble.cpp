@@ -7,6 +7,7 @@
 #include <chainparams.h>
 #include <cachesettings.h>
 #include <chainstatemanager.h>
+#include <shutdownnotification.h>
 #include <coinsviewcache.h>
 #include <consensus/merkle.h>
 #include <consensus/validation.h>
@@ -88,7 +89,8 @@ static void AssembleBlock(benchmark::State& state)
     CBlockPolicyEstimator fee_estimator;
     CTxMemPool mempool;
     const MempoolFeeListener fee_listener(mempool, fee_estimator);
-    ChainstateManager chainman;
+    ShutdownNotification shutdown;
+    ChainstateManager chainman(shutdown);
     chainman.InitConsensusSettings(std::make_unique<const ConsensusSettings>(ReadGenesisBlock(), TAPYRUS_OP_MODE::DEV, FederationParams().NetworkId()));
     chainman.InitXFieldHistory();
     // No script-check worker threads are started, so -par=1 checks scripts on the connecting thread.

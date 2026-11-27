@@ -718,7 +718,8 @@ static SendCoinsRecipient handleRequest(PaymentServer* server, std::vector<unsig
 void paymentServerTest()
 {
     SelectParams(TAPYRUS_OP_MODE::PROD);
-    NodeContext context;
+    ShutdownNotification shutdown;
+    NodeContext context(shutdown);
     auto node = interfaces::MakeNode(context);
     OptionsModel optionsModel(*node);
     PaymentServer* server = new PaymentServer(nullptr, false);

@@ -7,7 +7,6 @@
 #include <notificationhub.h>
 
 #include <clientversion.h>
-#include <shutdown.h>
 #include <sync.h>
 #include <ui_interface.h>
 #include <util.h>
@@ -86,6 +85,12 @@ void NotificationHub::ReportFatalError(FatalErrorReason reason, const std::strin
     Store(WarningId::FATAL_ERROR, message);
     LogPrintf("*** %s\n", message);
     for (Notifications* subscriber : Subscribers()) subscriber->ReportFatalError(reason, detail);
+}
+
+void NotificationHub::ReportShutdownRequested()
+{
+    LogPrintf("Shutdown requested\n");
+    for (Notifications* subscriber : Subscribers()) subscriber->ReportShutdownRequested();
 }
 
 void NotificationHub::ReportClockOutOfSync(std::chrono::minutes threshold)
@@ -254,18 +259,17 @@ void FatalErrorDialog::ReportFatalError(FatalErrorReason reason, const std::stri
     uiInterface.ThreadSafeMessageBox(message, "", CClientUIInterface::MSG_ERROR);
 }
 
-NodeShutdown& NodeShutdown::Instance()
-{
-    static NodeShutdown instance;
-    return instance;
-}
-
 void NodeShutdown::ReportFatalError(FatalErrorReason reason, const std::string& detail)
 {
-    StartShutdown();
+    m_shutdown.Request();
+}
+
+void NodeShutdown::ReportShutdownRequested()
+{
+    m_shutdown.Request();
 }
 
 void NodeShutdown::ReportStopHeightReached(int height)
 {
-    StartShutdown();
+    m_shutdown.Request();
 }

@@ -208,7 +208,7 @@ add_library(tapyrus_util STATIC EXCLUDE_FROM_ALL
         randomenv.cpp
         rpc/protocol.cpp
         scheduler.cpp
-        shutdown.cpp
+        shutdownnotification.cpp
         support/lockedpool.cpp
         sync.cpp
         threadinterrupt.cpp

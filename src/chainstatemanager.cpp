@@ -16,7 +16,7 @@
 #include <limits>
 #include <utility>
 
-ChainstateManager::ChainstateManager() = default;
+ChainstateManager::ChainstateManager(const ShutdownNotification& shutdown) : m_shutdown(shutdown) {}
 
 ChainstateManager::~ChainstateManager() = default;
 

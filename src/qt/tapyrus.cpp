@@ -31,6 +31,7 @@
 #include <interfaces/handler.h>
 #include <interfaces/node.h>
 #include <nodecontext.h>
+#include <shutdownnotification.h>
 #include <ui_interface.h>
 #include <uint256.h>
 #include <threadnames.h>
@@ -597,7 +598,8 @@ int main(int argc, char *argv[])
     ThreadSetInternalName("main");
     SetupEnvironment();
 
-    NodeContext node_context;
+    ShutdownNotification shutdown;
+    NodeContext node_context(shutdown);
     std::unique_ptr<interfaces::Chain> chain = interfaces::MakeChain(node_context);
     g_wallet_init_interface.SetChainInterface(chain.get());
     std::unique_ptr<interfaces::Node> node = interfaces::MakeNode(node_context);
@@ -710,7 +712,7 @@ int main(int argc, char *argv[])
     app.installEventFilter(new GUIUtil::ToolTipToRichTextFilter(TOOLTIP_WRAP_THRESHOLD, &app));
 #if defined(Q_OS_WIN)
     // Install global event filter for processing Windows session related Windows messages (WM_QUERYENDSESSION and WM_ENDSESSION)
-    qApp->installNativeEventFilter(new WinShutdownMonitor());
+    qApp->installNativeEventFilter(new WinShutdownMonitor([&node] { node->startShutdown(); }));
 #endif
     // Install qDebug() message handler to route to debug.log
     qInstallMessageHandler(DebugMessageHandler);

@@ -6,6 +6,7 @@
 
 #include <chainparams.h>
 #include <chainstatemanager.h>
+#include <shutdownnotification.h>
 #include <checkblock.h>
 #include <consensussettings.h>
 #include <federationparams.h>
@@ -46,7 +47,8 @@ static void DeserializeAndCheckBlockTest(benchmark::State& state)
     stream.write(&a, 1); // Prevent compaction
 
     const auto chainParams = CreateChainParams(TAPYRUS_OP_MODE::PROD);
-    ChainstateManager chainman;
+    ShutdownNotification shutdown;
+    ChainstateManager chainman(shutdown);
     chainman.InitConsensusSettings(std::make_unique<const ConsensusSettings>(ReadGenesisBlock(), TAPYRUS_OP_MODE::PROD, FederationParams().NetworkId()));
     chainman.InitXFieldHistory();
 

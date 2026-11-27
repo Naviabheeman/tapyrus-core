@@ -69,7 +69,8 @@ BOOST_FIXTURE_TEST_SUITE(pstt_wallet_tests, WalletTestingSetup)
 static UniValue CallPsttWalletRPC(const std::string& method, const UniValue& params)
 {
     BOOST_REQUIRE(tableRPC[method]);
-    NodeContext node;
+    ShutdownNotification shutdown;
+    NodeContext node(shutdown);
     JSONRPCRequest request(node);
     request.strMethod = method;
     request.params = params;
@@ -97,7 +98,8 @@ static UniValue CallPsttWalletRPCFromCli(const std::string& args)
     std::string strMethod = vArgs[0];
     vArgs.erase(vArgs.begin());
     BOOST_REQUIRE(tableRPC[strMethod]);
-    NodeContext node;
+    ShutdownNotification shutdown;
+    NodeContext node(shutdown);
     JSONRPCRequest request(node);
     request.strMethod = strMethod;
     request.params = RPCConvertValues(strMethod, vArgs);

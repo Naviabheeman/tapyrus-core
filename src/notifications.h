@@ -19,6 +19,7 @@ class Notifications : public ChainNotifications, public PeerNotifications, publi
 {
 public:
     void ReportFatalError(FatalErrorReason reason, const std::string& detail) override {}
+    void ReportShutdownRequested() override {}
     void ReportClockOutOfSync(std::chrono::minutes threshold) override {}
     void ReportClockInSync() override {}
     void ReportLargeWorkFork(const uint256& fork_base) override {}

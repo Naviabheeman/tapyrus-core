@@ -10,7 +10,7 @@
 #include <chainnotifications.h>
 #include <mempoolaccept.h>
 #include <policy/policy.h>
-#include <shutdown.h>
+#include <shutdownnotification.h>
 #include <trace.h>
 #include <validation.h>
 #include <xfieldhistory.h>
@@ -78,7 +78,7 @@ bool Chainstate::LoadMempool()
             } else {
                 ++expired;
             }
-            if (ShutdownRequested())
+            if (m_chainman.Shutdown().IsRequested())
                 return false;
         }
         std::map<uint256, CAmount> mapDeltas;

@@ -1085,7 +1085,8 @@ BOOST_FIXTURE_TEST_CASE(pstt_mixed_scheme_rejected_construction_and_execution_ag
 static UniValue CallPsttRPC(const std::string& method, const UniValue& params)
 {
     BOOST_REQUIRE(tableRPC[method]);
-    NodeContext node;
+    ShutdownNotification shutdown;
+    NodeContext node(shutdown);
     JSONRPCRequest request(node);
     request.strMethod = method;
     request.params = params;

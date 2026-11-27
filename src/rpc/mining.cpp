@@ -24,7 +24,7 @@
 #include <rpc/jsonrpcrequest.h>
 #include <rpc/rpctable.h>
 #include <rpc/util.h>
-#include <shutdown.h>
+#include <shutdownnotification.h>
 #include <tapyrusmodes.h>
 #include <txmempool.h>
 #include <util.h>
@@ -61,7 +61,7 @@ UniValue generateBlocks(ChainstateManager& chainman, const PolicySettings& polic
     }
     unsigned int nExtraNonce = 0;
     UniValue blockHashes(UniValue::VARR);
-    while (nHeight < nHeightEnd && !ShutdownRequested())
+    while (nHeight < nHeightEnd && !chainman.Shutdown().IsRequested())
     {
         std::unique_ptr<CBlockTemplate> pblocktemplate;
         {

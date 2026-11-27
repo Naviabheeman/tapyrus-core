@@ -32,7 +32,7 @@
 #include <rpc/rpctable.h>
 #include <rpc/rpctimerinterface.h>
 #include <scheduler.h>
-#include <shutdown.h>
+#include <shutdownnotification.h>
 #include <sync.h>
 #include <txmempool.h>
 #include <ui_interface.h>
@@ -78,7 +78,7 @@ public:
     uint32_t getLogCategories() override { return LogInstance().GetCategoryMask(); }
     bool baseInitialize() override
     {
-        return AppInitBasicSetup() && AppInitParameterInteraction(m_context) && AppInitSanityChecks() &&
+        return AppInitBasicSetup(m_context) && AppInitParameterInteraction(m_context) && AppInitSanityChecks() &&
                AppInitLockDataDirectory();
     }
     bool appInitMain() override { return AppInitMain(m_context); }
@@ -87,8 +87,8 @@ public:
         Interrupt(m_context);
         Shutdown(m_context);
     }
-    void startShutdown() override { StartShutdown(); }
-    bool shutdownRequested() override { return ShutdownRequested(); }
+    void startShutdown() override { m_context.notifications.ReportShutdownRequested(); }
+    bool shutdownRequested() override { return m_context.shutdown.IsRequested(); }
     void mapPort(bool use_upnp) override
     {
         if (use_upnp) {

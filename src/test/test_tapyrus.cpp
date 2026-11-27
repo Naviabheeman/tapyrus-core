@@ -85,7 +85,7 @@ BasicTestingSetup::BasicTestingSetup(const std::string& chainName)
         SetupEnvironment();
         SetupNetworking();
         m_node.cache = std::make_unique<const CacheSettings>(gArgs);
-        m_node.chainman = std::make_unique<ChainstateManager>();
+        m_node.chainman = std::make_unique<ChainstateManager>(m_node.shutdown);
         ChainstateManager& chainman = *m_node.chainman;
         {
             LOCK(cs_main);
